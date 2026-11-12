@@ -31,7 +31,7 @@
 .v2-figure{font-size:30px;line-height:1.35;font-weight:750;letter-spacing:-.04em;margin:4px 0 10px}
 .v2-figure span{font-size:12px;font-weight:400;letter-spacing:0;color:#64748b}
 .v2-methods{margin-top:15px;display:grid;gap:8px}
-.v2-methods>div{display:flex;justify-content:space-between;gap:12px;padding:8px 11px;border:1px solid #e8edf5;background:#f8fafc;border-radius:8px;font-size:12px}
+.v2-methods>details{padding:8px 11px;border:1px solid #e8edf5;background:#f8fafc;border-radius:8px;font-size:12px}.v2-methods summary{display:flex;justify-content:space-between;gap:12px;cursor:pointer;align-items:center}.v2-methods details[open]{background:#fff}.v2-methods details p{font-size:11px;line-height:1.6;margin:8px 0 0;color:#536278}.v2-methods details p b{color:#20314a}
 .v2-methods span{color:#66758b}
 .v2-muted{font-size:11px;color:#718096;line-height:1.6;margin:10px 0 0}
 .v2-window-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
