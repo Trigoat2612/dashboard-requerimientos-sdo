@@ -8,9 +8,10 @@ import { createHash } from 'node:crypto';
 const docKey = id => 'doc-' + createHash('sha256').update(String(id ?? '')).digest('hex').slice(0, 20);
 const restricted = 'Detalle institucional reservado; consultar mediante un canal autorizado.';
 
-export function buildPublicMetadata({ requests, sdo, documents, methods, evidence, assessments, compliance, classification }) {
+export function buildPublicMetadata({ requests, sdo, documents, methods, evidence, assessments, compliance, classification, estimateMethodCounts = [] }) {
     const bySdo = new Map(compliance.map(c => [c.code, c]));
     const byRequest = new Map(classification.map(c => [String(c.request_id), c]));
+    const estimateCountByRequest = new Map(estimateMethodCounts.map(e => [String(e.request_id), Number(e.total) || 0]));
     const docNames = new Map(documents.map((d, i) => [String(d.id), 'Documento institucional ' + String(i + 1).padStart(4, '0')]));
     return {
       access: 'public_metadata_only',
@@ -27,7 +28,8 @@ export function buildPublicMetadata({ requests, sdo, documents, methods, evidenc
           v07_classification: c?.classification || null, v07_proposal_status: c?.proposal_status || null,
           v07_reviewed_at: c?.reviewed_at || null, compliance_status: 'Propuesta, no aprobada',
           evidence_status: null, hours_min: null, hours_expected: null, hours_max: null,
-          estimate_confidence: null, estimation_basis: null
+          estimate_confidence: null, estimation_basis: null,
+          v08_independent_method_count: estimateCountByRequest.get(String(r.id)) || 0
         };
       }),
       sdo: sdo.map(r => {
@@ -79,7 +81,7 @@ export default async function handler(req, res) {
     const sql = neon(process.env.DATABASE_URL);
     // Proyección positiva: nunca leer ni serializar campos confidenciales
     // en una respuesta pública. Los joins se basan en claves y no en texto.
-    const [requests, sdo, documents, methods, evidence, assessments, compliance, classification] = await Promise.all([
+    const [requests, sdo, documents, methods, evidence, assessments, compliance, classification, estimateMethodCounts] = await Promise.all([
       sql`SELECT id, request_code, area, component, requirement_class, status AS historical_status FROM ejenp_requerimientos_sdo.proposed_requirements ORDER BY request_code`,
       sql`SELECT code, stage, layer, component, requirement_type, cycle, progress_reported, progress_route_count FROM ejenp_requerimientos_sdo.sdo_requirements ORDER BY code`,
       sql`SELECT id, category, mime_type, scan_status FROM ejenp_requerimientos_sdo.source_documents WHERE mime_type <> 'application/vnd.google-apps.folder' ORDER BY id`,
@@ -87,9 +89,10 @@ export default async function handler(req, res) {
       sql`SELECT sdo_code, document_id, confidence FROM ejenp_requerimientos_sdo.requirement_evidence ORDER BY sdo_code`,
       sql`SELECT id, document_id, sdo_code, coverage, review_level FROM ejenp_requerimientos_sdo.document_assessments ORDER BY id DESC`,
       sql`SELECT code, proposed_evaluation, proposal_status, reviewed_at FROM ejenp_requerimientos_sdo.sdo_compliance_proposals`,
-      sql`SELECT request_id, classification, proposal_status, related_sdo_codes, reviewed_at FROM ejenp_requerimientos_sdo.request_classification_proposals`
+      sql`SELECT request_id, classification, proposal_status, related_sdo_codes, reviewed_at FROM ejenp_requerimientos_sdo.request_classification_proposals`,
+      sql`SELECT request_id, COUNT(*)::int AS total FROM ejenp_requerimientos_sdo.hours_estimate_proposals GROUP BY request_id`
     ]);
-    return res.status(200).json(buildPublicMetadata({requests,sdo,documents,methods,evidence,assessments,compliance,classification}));
+    return res.status(200).json(buildPublicMetadata({requests,sdo,documents,methods,evidence,assessments,compliance,classification,estimateMethodCounts}));
   } catch (error) {
     console.error('V09 metadata read failed');
     return res.status(500).json({ error: 'No se pudieron recuperar los indicadores de Neon' });
