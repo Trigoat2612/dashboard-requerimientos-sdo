@@ -1,14 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Download, Filter, RefreshCw, Search, ShieldCheck } from 'lucide-react';
 import { filterGaps, gapExportRows, pageGaps, GAP_KINDS, GAP_SEVERITIES, GAP_STATES } from './gap-model.js';
+import { toSafeCsv } from './csv-utils.js';
 
 const EMPTY = { rows: [], access: 'restricted', error: '' };
-const safe = x => {
-  const value = String(x ?? '').replace(/^([\s]*[=+@-])/, "'$1");
-  return '"' + value.replaceAll('"', '""') + '"';
-};
 function exportCsv(rows) {
-  const data = '\uFEFF' + gapExportRows(rows).map(r => r.map(safe).join(';')).join('\r\n');
+  const data = toSafeCsv(gapExportRows(rows));
   const blob = new Blob([data], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
