@@ -25,13 +25,22 @@ export function createInstitutionalHandler({
           sql`SELECT request_id,classification,basis,contractual_evidence,related_sdo_codes,related_gap_ids,duplicate_of_request_id,proposed_by,proposal_status,reviewed_at FROM ejenp_requerimientos_sdo.request_classification_proposals`,
           sql`SELECT id,title,url,category,mime_type,parent_id,size_bytes,modified_at,scan_status,verification_notes,checked_at FROM ejenp_requerimientos_sdo.source_documents WHERE mime_type<>'application/vnd.google-apps.folder' ORDER BY title`,
           sql`SELECT name,supplier_proposed,description,strengths,risks,decision,source_document_id FROM ejenp_requerimientos_sdo.methodology_reviews ORDER BY name`,
-          sql`SELECT id,proposed_requirement_id,sdo_code,document_id,rationale,evidence_type,confidence,created_at FROM ejenp_requerimientos_sdo.requirement_evidence ORDER BY sdo_code`,
-          sql`SELECT id,document_id,sdo_code,criterion,coverage,finding,missing_validation,source_detail,review_level,reviewed_at FROM ejenp_requerimientos_sdo.document_assessments ORDER BY id DESC`,
+          sql`SELECT id,proposed_requirement_id,sdo_code,document_id,evidence_type,confidence,created_at FROM ejenp_requerimientos_sdo.requirement_evidence ORDER BY sdo_code`,
+          sql`SELECT id,document_id,sdo_code,criterion,coverage,review_level,reviewed_at FROM ejenp_requerimientos_sdo.document_assessments ORDER BY id DESC`,
           sql`SELECT request_id,COUNT(*)::int AS total FROM ejenp_requerimientos_sdo.hours_estimate_proposals GROUP BY request_id`
         ]);
         return res.status(200).json(buildInstitutionalDashboard({
           requirements,compliance,requests,classifications,documents,methods,evidence,assessments,estimateCounts
         }));
+      }
+      // Paginación lógica por demanda: evita respuestas de varios MB en el dashboard.
+      // Evaluaciones completas se obtienen únicamente al abrir auditoría/contraste.
+      if (view==='assessments') {
+        const rows=await sql`SELECT a.id,a.document_id,a.sdo_code,a.criterion,a.coverage,a.finding,a.missing_validation,
+          a.source_detail,a.review_level,a.reviewed_at,d.title AS document_title,d.url AS document_url
+          FROM ejenp_requerimientos_sdo.document_assessments a
+          LEFT JOIN ejenp_requerimientos_sdo.source_documents d ON d.id=a.document_id ORDER BY a.id DESC`;
+        return res.status(200).json({access:'institutional_verified',rows,generatedAt:new Date().toISOString()});
       }
       if (view==='detail') {
         const kind=req.query?.kind, id=req.query?.id;
