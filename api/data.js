@@ -1,22 +1,17 @@
 import { neon } from '@neondatabase/serverless';
-import { createHash } from 'node:crypto';
-
-// V09: la consulta anónima expone solo metadatos de seguimiento.
-// No hay identidad de usuario verificada: NO devolver documentos, URLs de Drive,
-// textos de solicitudes, conclusiones técnicas, identificadores judiciales ni hallazgos.
-// La vista institucional completa requerirá autorización verificable de servidor.
-const docKey = id => 'doc-' + createHash('sha256').update(String(id ?? '')).digest('hex').slice(0, 20);
+// Los documentos, enlaces y evaluaciones documentales se consultan sin filtros de título.
+// Los fundamentos adicionales V06/V07 mantienen un endpoint independiente de lectura autorizada.
 const restricted = 'Texto original disponible mediante acceso institucional individual.';
 
 export function buildPublicMetadata({ requests, sdo, documents, methods, evidence, assessments, compliance, classification, estimateMethodCounts = [] }) {
     const bySdo = new Map(compliance.map(c => [c.code, c]));
     const byRequest = new Map(classification.map(c => [String(c.request_id), c]));
     const estimateCountByRequest = new Map(estimateMethodCounts.map(e => [String(e.request_id), Number(e.total) || 0]));
-    const docNames = new Map(documents.map((d, i) => [String(d.id), 'Documento institucional ' + String(i + 1).padStart(4, '0')]));
+    const docById = new Map(documents.map(d => [String(d.id),d]));
     return {
       access: 'public_metadata_only',
-      dataScope: 'Metadatos anonimizados; NO son fichas institucionales completas',
-      accessNotice: 'Los textos, URLs y hallazgos institucionales no se publican sin autenticación individual verificable.',
+      dataScope: 'Documentos y evaluaciones documentales completos; fundamentos adicionales V06/V07 requieren acceso individual.',
+      accessNotice: 'Los documentos y sus enlaces se presentan sin ocultamientos; solo la evaluación institucional completa V06/V07 utiliza autorización individual.',
       requests: requests.map(r => {
         const c = byRequest.get(String(r.id));
         return {
@@ -44,22 +39,16 @@ export function buildPublicMetadata({ requests, sdo, documents, methods, evidenc
           v06_proposal_status: c?.proposal_status || null, v06_reviewed_at: c?.reviewed_at || null
         };
       }),
-      documents: documents.map(d => ({
-        id: docKey(d.id), title: docNames.get(String(d.id)), url: null,
-        category: d.category, mime_type: d.mime_type, parent_id: null, size_bytes: null,
-        modified_at: null, scan_status: d.scan_status, verification_notes: null, checked_at: null
-      })),
+      documents: documents.map(d => ({...d})),
       evidence: evidence.map(e => ({
-        sdo_code: e.sdo_code, document_id: docKey(e.document_id),
-        document_title: docNames.get(String(e.document_id)) || 'Documento institucional',
-        document_url: null, rationale: restricted, confidence: e.confidence
+        ...e,
+        document_title: e.document_title ?? docById.get(String(e.document_id))?.title ?? null,
+        document_url: e.document_url ?? docById.get(String(e.document_id))?.url ?? null
       })),
       assessments: assessments.map(a => ({
-        id: a.id, document_id: docKey(a.document_id), sdo_code: a.sdo_code,
-        document_title: docNames.get(String(a.document_id)) || 'Documento institucional',
-        document_url: null, criterion: 'Criterio de revisión reservado',
-        coverage: a.coverage, review_level: a.review_level,
-        finding: restricted, missing_validation: restricted, source_detail: restricted, reviewed_at: null
+        ...a,
+        document_title: a.document_title ?? docById.get(String(a.document_id))?.title ?? null,
+        document_url: a.document_url ?? docById.get(String(a.document_id))?.url ?? null
       })),
       methods: methods.map(m => ({
         name: m.name, supplier_proposed: m.supplier_proposed, description: restricted,
