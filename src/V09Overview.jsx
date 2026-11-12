@@ -82,8 +82,8 @@ export default function V09Overview({ onNavigate }) {
           <Fact label="Expedientes SDO con dictamen V06" value={fmt(reviewed)}/>
           <button className="v2-refresh" onClick={() => onNavigate?.('v2')}>Ver control V00–V08</button>
         </Section>
-        <Section icon={ShieldCheck} title="6. Control institucional y acceso" note="Las fuentes de detalle requieren autorización institucional individual.">
-          <p className="v2-muted">Los resultados V06 y V07 son propuestas; los registros de aprobación no se infieren. La interfaz pública ofrece metadatos y agregados, no el contenido de documentos, solicitudes ni hallazgos restringidos.</p>
+        <Section icon={ShieldCheck} title="6. Control institucional y acceso" note="Los documentos y sus enlaces son consultables; los fundamentos V06/V07 completos mantienen acceso individual.">
+          <p className="v2-muted">Los documentos, enlaces, hallazgos y solicitudes se consultan directamente desde el inventario. Las propuestas V06 y V07 no equivalen a aprobaciones institucionales.</p>
           <Fact label="Última consulta" value={d.generatedAt ? new Date(d.generatedAt).toLocaleString('es-PE',{timeZone:'America/Lima'}) : 'Sin fecha'}/>
           <Fact label="Estado de la consolidación de brechas" value="Pendiente de modelo validado"/>
         </Section>
