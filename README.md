@@ -1,28 +1,38 @@
 # Dashboard de Requerimientos SDO | EJE No Penal
 
-Dashboard responsive desarrollado en Vite + React + API Serverless, base de datos en Neon PostgreSQL.
+Aplicación existente en Vite + React, API Serverless y Neon PostgreSQL.
+**V09 evoluciona esta solución, sin reconstruirla ni modificar los registros de los agentes V00–V08.**
 
-**Destino oficial**
+## Infraestructura de referencia
+
 - GitHub: https://github.com/Trigoat2612/dashboard-requerimientos-sdo
-- Neon: proyecto `seguimientopejenp`, base PostgreSQL `neondb`, esquema `ejenp_requerimientos_sdo`.
-- Vercel: proyecto independiente para este repositorio.
+- Neon: proyecto `super-credit-91949836`, base `neondb`, esquema `ejenp_requerimientos_sdo`.
+- Vercel (producción existente): https://dashboard-requerimientos-sdo.vercel.app/
+- Rama de desarrollo: `feature/v09-dashboard-alineamiento`.
+- **Nota:** el proyecto Vercel no ha podido verificarse con los permisos del conector disponibles. La rama V09 no implica despliegue a producción.
 
-## Módulos
-1. Resumen ejecutivo de requisitos SDO, backlog y horas preliminares.
-2. Requisitos funcionales y no funcionales (475 registros de la matriz SDO).
-3. Los 68 candidatos seleccionados del backlog y la ficha de asociación con componente/SDO/brecha/observaciones/estado.
-4. Bitácora documental con procedencia, estado de análisis y vínculos originales.
-5. Evaluación comparativa de métodos de estimación y propuesta Softplan.
+## Interpretación de indicadores V09
 
-## Variables de servidor para Vercel
-- `DATABASE_URL`: cadena PostgreSQL de la **base neondb del proyecto seguimientopejenp**, no del proyecto Neon anterior.
+1. **511 requisitos SDO:** el dictamen de `sdo_compliance_proposals` es una propuesta V06, no conformidad oficial.
+2. **68 solicitudes:** la clasificación propuesta procede de `request_classification_proposals` (V07), no del estado histórico del backlog.
+3. **Bolsa de horas:** solo los registros de `hours_estimate_proposals` corresponden a métodos independientes de V08. No se suman métodos alternativos ni se infiere aprobación.
+4. **6.800 h históricas:** suma de triaje en `proposed_requirements`; no está validada como esfuerzo incremental ni horas aprobadas.
+5. **Brechas:** el diseño aditivo propuesto está en `sql/v09-gap-register-DRAFT.sql`. **No ha sido ejecutado.** No derivar automáticamente brechas de estados de cumplimiento parcial.
+6. **Auditoría documental y operativa:** se consumen los datos agregados de `audit_v2_*` y las colas sin modificar reservas.
 
-La función `/api/data` permite consulta sin clave. `/api/update` responde 403 para impedir escrituras anónimas; las modificaciones institucionales se realizan por un canal autenticado. Las consultas usan exclusivamente `ejenp_requerimientos_sdo.*`.
-Vercel: Framework Vite; raíz del repositorio; compilación `npm run build`; salida `dist`.
-**Importante:** autenticar el acceso a la aplicación y restringir el despliegue para datos institucionales. El control de acceso actual es básico y no reemplaza autenticación individual con auditoría.
+Los números se leen desde Neon y evolucionan a medida que V00–V08 registran nuevos resultados.
 
-## Criterio de evaluación
-Una mención documental no constituye conformidad funcional. Las horas iniciales son triaje paramétrico y no equivalen a conteo contractual IFPUG aprobado. Los resultados de cumplimiento deben sustentarse en documentación, pruebas y conformidad.
+## Seguridad
 
-## Acceso sin clave compartida
-El dashboard no usa DASHBOARD_ACCESS_KEY ni muestra un inicio de sesión local. La vista puede ser pública. **No se admiten escrituras anónimas** desde la API para evitar alteraciones del análisis institucional. El equipo debe activar autenticación personal antes de permitir edición en línea.
+- `/api/data` expone **únicamente metadatos estructurados y redacción de contenido**. No devuelve descripciones de expedientes, documentos, títulos reales, vínculos de Drive ni hallazgos. Los IDs documentales son pseudónimos estables.
+- `/api/v2-summary` publica datos agregados. La aplicación distingue evaluaciones propuestas de aprobaciones.
+- `/api/update` responde 403 y no permite escritura anónima.
+- **No se utiliza `DASHBOARD_ACCESS_KEY`.** La consulta completa de detalles exige autenticación personal verificable y autorización institucional, todavía no implementadas. No resolver este requisito mediante simples listas de palabras prohibidas en títulos.
+- Hasta concluir las pruebas de seguridad y acceso, los cambios V09 deben permanecer en rama/PR de revisión y fuera de producción.
+
+## Validación
+
+- Construcción: `npm install --no-audit --no-fund && npm run build`.
+- GitHub Actions: workflow `Verificación del tablero de brechas` ejecutado en el PR de V09.
+- Verificar las métricas ante Neon en el mismo momento de la revisión, porque V00–V08 trabajan en paralelo.
+- No fusionar sin controles de seguridad, pruebas funcionales y regresión del despliegue.
