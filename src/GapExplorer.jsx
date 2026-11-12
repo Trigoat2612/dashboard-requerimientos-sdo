@@ -37,7 +37,8 @@ export default function GapExplorer({ onOpenSdo, onOpenRequest }) {
       }
       if (!r.ok) throw new Error(body.error || 'No se pudo consultar el registro de brechas');
       if (!Array.isArray(body.rows)) throw new Error('Respuesta de datos inválida');
-      setStore({ rows: body.rows, access: body.access || 'institutional_verified', loading: false, error: '' });
+      if (body.access !== 'institutional_verified') {setStore({...EMPTY,loading:false,error:'La respuesta no acreditó autorización institucional.'});return;}
+      setStore({ rows: body.rows, access: body.access, loading: false, error: '' });
     } catch (error) {
       setStore(s => ({ ...s, loading: false, error: error.message || 'Error de consulta' }));
     }
