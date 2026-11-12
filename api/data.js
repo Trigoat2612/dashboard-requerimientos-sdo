@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     const sql = neon(process.env.DATABASE_URL);
     const [requests, sdo, documents, methods, evidence, suggestions] = await Promise.all([
       sql`SELECT id, source_row, request_code, area, request_text, requester, sdo_reference, gap_reference, component, requirement_class, evidence_status, compliance_status, status, comments, hours_min, hours_expected, hours_max, estimate_confidence, estimation_basis, updated_at FROM ejenp_requerimientos_sdo.proposed_requirements ORDER BY request_code`,
-      sql`SELECT code, stage, layer, component, description, requirement_type, cycle, verification_status, notes FROM ejenp_requerimientos_sdo.sdo_requirements ORDER BY code`,
+      sql`SELECT code, stage, layer, component, description, requirement_type, cycle, verification_status, notes, progress_reported, progress_basis, progress_route_count FROM ejenp_requerimientos_sdo.sdo_requirements ORDER BY code`,
       sql`SELECT id, title, url, category, mime_type, parent_id, size_bytes, modified_at, scan_status, verification_notes, checked_at FROM ejenp_requerimientos_sdo.source_documents WHERE mime_type <> 'application/vnd.google-apps.folder' ORDER BY title`,
       sql`SELECT name, supplier_proposed, description, strengths, risks, decision, source_document_id FROM ejenp_requerimientos_sdo.methodology_reviews ORDER BY supplier_proposed DESC, name`,
       sql`SELECT e.sdo_code,e.document_id,e.rationale,e.confidence,d.title AS document_title,d.url AS document_url FROM ejenp_requerimientos_sdo.requirement_evidence e LEFT JOIN ejenp_requerimientos_sdo.source_documents d ON d.id=e.document_id ORDER BY e.sdo_code`,
