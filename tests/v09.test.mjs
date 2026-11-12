@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { filterGaps, pageGaps, gapExportRows } from '../src/gap-model.js';
 import { escapeCsvCell, toSafeCsv } from '../src/csv-utils.js';
-import dataHandler from '../api/data.js';
+import dataHandler, { buildPublicMetadata } from '../api/data.js';
 import gapsHandler from '../api/gaps.js';
 import updateHandler from '../api/update.js';
 
@@ -41,21 +41,57 @@ test('exportación conserva las claves referenciales y no crea horas', () => {
   assert.equal(rows[1][2], 'RFU-01');
   assert.ok(!rows[0].includes('Horas'));
 });
-for(const [name, handler] of [['data', dataHandler], ['gaps', gapsHandler]]) {
-  test('/api/'+name+' deniega usuario anónimo y credenciales no verificadas', async () => {
-    for(const headers of [{}, {authorization:'Bearer inventado'}, {cookie:'session=sin_verificar'}]) {
-      const res = response();
-      await handler({ method:'GET', headers }, res);
-      assert.equal(res.statusCode, 403);
-      assert.equal(res.body.code, 'INSTITUTIONAL_ACCESS_REQUIRED');
-      assert.match(String(res.headers['Cache-Control']), /no-store/);
-      assert.ok(!JSON.stringify(res.body).includes('RFU-'));
-    }
-    const res = response();
-    await handler({ method:'POST' }, res);
-    assert.equal(res.statusCode, 405);
+test('proyección pública conserva las clasificaciones y elimina contenidos institucionales', () => {
+  const secret = 'INFORMACION_INTERNA_CONFIDENCIAL_741';
+  const payload = buildPublicMetadata({
+    requests: [{id:4,request_code:'REQ00004',area:'Área',component:'Componente',request_text:secret,requester:secret,hours_expected:999}],
+    sdo:[{code:'RFU-01',stage:'E1',layer:'Servicio',component:'Consulta',requirement_type:'Funcional',cycle:'1',description:secret,verification_status:secret}],
+    documents:[{id:'drive-original-secreto',category:'Diseño',mime_type:'application/pdf',scan_status:'Contrastado',title:secret,url:'https://internal.example/secret'}],
+    methods:[{name:'WBS',supplier_proposed:true,description:secret}],
+    evidence:[{sdo_code:'RFU-01',document_id:'drive-original-secreto',confidence:'Alta',rationale:secret}],
+    assessments:[{id:1,sdo_code:'RFU-01',document_id:'drive-original-secreto',coverage:'Parcial',review_level:'Análisis documental contrastado',finding:secret,source_detail:secret,missing_validation:secret}],
+    compliance:[{code:'RFU-01',proposed_evaluation:'Cumplimiento parcial',proposal_status:'Propuesta'}],
+    classification:[{request_id:4,classification:'Indeterminada',related_sdo_codes:['RFU-01'],proposal_status:'Propuesta'}]
   });
-}
+  assert.equal(payload.access, 'public_metadata_only');
+  assert.equal(payload.sdo[0].v06_evaluation, 'Cumplimiento parcial');
+  assert.equal(payload.requests[0].v07_classification, 'Indeterminada');
+  assert.equal(payload.documents[0].url, null);
+  assert.equal(payload.documents[0].title.startsWith('Documento institucional'), true);
+  assert.equal(payload.evidence[0].document_id, payload.documents[0].id);
+  assert.equal(payload.requests[0].hours_expected, null);
+  assert.ok(!JSON.stringify(payload).includes(secret));
+  assert.ok(!JSON.stringify(payload).includes('drive-original-secreto'));
+  assert.ok(!JSON.stringify(payload).includes('internal.example'));
+});
+test('endpoints de consulta aceptan GET, rechazan POST y no divulgan secretos ante error', async () => {
+  const before = process.env.DATABASE_URL;
+  delete process.env.DATABASE_URL;
+  try {
+    for (const handler of [dataHandler,gapsHandler]) {
+      const post = response();
+      await handler({method:'POST'},post);
+      assert.equal(post.statusCode,405);
+      const get = response();
+      await handler({method:'GET',headers:{authorization:'Bearer falso'}},get);
+      assert.equal(get.statusCode,503);
+      assert.ok(!JSON.stringify(get.body).includes('DATABASE_URL='));
+      assert.match(String(get.headers['Cache-Control']),/no-store/);
+    }
+  } finally {
+    if(before===undefined)delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL=before;
+  }
+});
+test('las consultas públicas no seleccionan textos contractuales, fuentes ni hallazgos', () => {
+  const code = readFileSync(new URL('../api/data.js',import.meta.url),'utf8');
+  const sqlProjection = code.slice(code.indexOf('const [requests, sdo, documents'),code.indexOf('return res.status(200).json(buildPublicMetadata'));
+  assert.doesNotMatch(sqlProjection, /SELECT\\s+\\*/i);
+  assert.doesNotMatch(sqlProjection, /\\b(request_text|requester|description|finding|missing_validation|source_detail|rationale|url|basis|evidence_references|contractual_evidence|hours_expected)\\b/i);
+  const gaps = readFileSync(new URL('../api/gaps.js',import.meta.url),'utf8');
+  assert.doesNotMatch(gaps, /SELECT[^;]*(?:basis|contractual_evidence|finding|request_text)/i);
+  assert.match(gaps, /registryStatus: 'not_migrated'/);
+});
 test('/api/update mantiene prohibición de escritura anónima', async () => {
   const res = response();
   await updateHandler({method:'POST'}, res);
