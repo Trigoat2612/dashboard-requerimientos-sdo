@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, sign } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import {
   institutionalAuthConfig, verifyInstitutionalToken, AuthenticationError
 } from '../lib/institutional-auth.js';
@@ -156,7 +157,7 @@ test('integración: JWT válido accede, JWT inválido no toca Neon',async()=>{
   }finally{if(previous===undefined)delete process.env.DATABASE_URL;else process.env.DATABASE_URL=previous;}
 });
 test('la API no utiliza otra base ni operaciones de escritura o claves compartidas',()=>{
-  const code=String((await import('node:fs')).readFileSync(new URL('../api/institutional-data.js',import.meta.url),'utf8'));
+  const code=readFileSync(new URL('../api/institutional-data.js',import.meta.url),'utf8');
   assert.doesNotMatch(code,/\b(?:INSERT\s+INTO|UPDATE\s+ejenp|DELETE\s+FROM|DROP\s+TABLE)\b/i);
   assert.doesNotMatch(code,/DASHBOARD_ACCESS_KEY/);
   assert.match(code,/ejenp_requerimientos_sdo\.sdo_requirements/);
