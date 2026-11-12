@@ -72,7 +72,7 @@ export function createInstitutionalHandler({
           const [c,e,q,h]=await Promise.all([
             sql`SELECT classification,basis,contractual_evidence,related_sdo_codes,related_gap_ids,duplicate_of_request_id,proposed_by,proposal_status,reviewed_at FROM ejenp_requerimientos_sdo.request_classification_proposals WHERE request_id=${requestId}`,
             sql`SELECT e.id,e.sdo_code,e.rationale,e.evidence_type,e.confidence,d.id AS document_id,d.title AS document_title,d.url AS document_url FROM ejenp_requerimientos_sdo.requirement_evidence e LEFT JOIN ejenp_requerimientos_sdo.source_documents d ON d.id=e.document_id WHERE e.proposed_requirement_id=${requestId}`,
-            sql`SELECT task_type,status,notes,updated_at FROM ejenp_requerimientos_sdo.request_analysis_queue WHERE request_id=${requestId} ORDER BY task_type`,
+            sql`SELECT task_type,status,assigned_window,notes,updated_at FROM ejenp_requerimientos_sdo.request_analysis_queue WHERE request_id=${requestId} ORDER BY task_type`,
             sql`SELECT method,estimate_min,estimate_expected,estimate_max,unit,basis,source_references,exclusions_contractual,assumptions,proposed_by,proposal_status FROM ejenp_requerimientos_sdo.hours_estimate_proposals WHERE request_id=${requestId}`
           ]);
           return res.status(200).json(buildInstitutionalDetail(kind,r[0],{classification:c[0],evidence:e,queue:q,estimates:h}));
