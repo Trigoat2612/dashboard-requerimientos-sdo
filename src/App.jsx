@@ -33,7 +33,7 @@ export default function App(){
   const [loading,setLoading]=useState(true),[error,setError]=useState(''),[restricted,setRestricted]=useState(false),[publicRedacted,setPublicRedacted]=useState(false);
   const [active,setActive]=useState('resumen'),[query,setQuery]=useState(''),[typeFilter,setTypeFilter]=useState('Todos'),[areaFilter,setAreaFilter]=useState('Todas'),[statusFilter,setStatusFilter]=useState('Todos'),[levelFilter,setLevelFilter]=useState('Todos los niveles'),[page,setPage]=useState(1);
   const [mobile,setMobile]=useState(false),[navSearch,setNavSearch]=useState(''),[selectedDetail,setSelectedDetail]=useState(null);
-  const [institutionalToken,setInstitutionalToken]=useState(null),[identity,setIdentity]=useState(null);
+  const [institutionalToken,setInstitutionalToken]=useState(null),[identity,setIdentity]=useState(null),[sessionNotice,setSessionNotice]=useState('');
   const loadEpoch=useRef(0);
   const emptyData=()=>({requests:[],sdo:[],documents:[],methods:[],evidence:[],suggestions:[],assessments:[]});
   async function refresh(token=institutionalToken){
@@ -47,7 +47,7 @@ export default function App(){
       const body=await r.json();
       if(epoch!==loadEpoch.current)return;
       if(authenticated&&(r.status===401||r.status===403)){
-        setIdentity(null);setInstitutionalToken(null);setData(emptyData());setSelectedDetail(null);return;
+        setSessionNotice('Tu sesión institucional terminó o dejó de estar autorizada. Inicia sesión nuevamente.');setIdentity(null);setInstitutionalToken(null);setData(emptyData());setSelectedDetail(null);return;
       }
       if(!r.ok)throw Error(body.error||'Consulta no disponible');
       if(body.access!==(authenticated?'institutional_verified':'public_metadata_only'))throw Error('Respuesta no corresponde al nivel de autorización');
@@ -65,13 +65,21 @@ export default function App(){
     });
     const result=await r.json();
     if(!r.ok||!result.authenticated)throw Error(result.error||'Acceso institucional no autorizado');
-    setSelectedDetail(null);setIdentity({email:result.email,expiresAt:result.expiresAt});setInstitutionalToken(credential);
+    setSessionNotice('');setSelectedDetail(null);setIdentity({email:result.email,expiresAt:result.expiresAt});setInstitutionalToken(credential);
   },[]);
-  const signOut=useCallback(()=>{
+  const signOut=useCallback((notice='')=>{
+    setSessionNotice(typeof notice==='string'?notice:'');
     ++loadEpoch.current;
     setInstitutionalToken(null);setIdentity(null);setData(emptyData());setSelectedDetail(null);
     setPublicRedacted(false);setRestricted(false);
   },[]);
+  useEffect(()=>{
+    if(!identity?.expiresAt || !institutionalToken)return;
+    const remaining=identity.expiresAt*1000-Date.now();
+    if(remaining<=0){signOut('Tu sesión institucional expiró. Vuelve a identificarte para consultar los análisis.');return;}
+    const timeout=setTimeout(()=>signOut('Tu sesión institucional expiró. Vuelve a identificarte para consultar los análisis.'),remaining);
+    return ()=>clearTimeout(timeout);
+  },[identity,institutionalToken,signOut]);
   useEffect(()=>{
     if(!institutionalToken||!['cobertura','auditoria'].includes(active))return;
     const controller=new AbortController();
@@ -79,7 +87,7 @@ export default function App(){
       headers:{Authorization:'Bearer '+institutionalToken},cache:'no-store',signal:controller.signal
     }).then(async r=>{
       const body=await r.json();
-      if(r.status===401||r.status===403){signOut();throw Error('Sesión institucional no autorizada');}
+      if(r.status===401||r.status===403){signOut('Sesión institucional vencida o sin autorización. Inicia sesión nuevamente.');throw Error('La sesión requiere nueva autenticación');}
       if(!r.ok||body.access!=='institutional_verified'||!Array.isArray(body.rows))throw Error(body.error||'No se pudieron consultar las evaluaciones documentales');
       return body.rows;
     }).then(rows=>{if(!controller.signal.aborted)setData(prev=>prev.access==='institutional_verified'?{...prev,assessments:rows}:prev);})
@@ -104,15 +112,15 @@ export default function App(){
   const assessedCount=[...reviewedByDoc.keys()].filter(id=>visibleDocumentIds.has(id)).length;
   const auditRows=useMemo(()=>{const linked=new Set(data.evidence.map(e=>String(e.document_id)));return data.documents.map(d=>{const a=reviewedByDoc.get(String(d.id));const level=!a?'Sin evaluación':a.levels.has('Análisis documental contrastado')?'Contraste detallado':a.levels.has('Análisis documental preliminar')?'Análisis preliminar':'Inspección preliminar';return {...d,assessment_count:a?.count||0,linked:linked.has(String(d.id)),review_level_display:level,review_finding:a?.finding||'',not_verifiable:a?.coverage.size===1&&a.coverage.has('No verificable')}}).filter(d=>(statusFilter==='Todos'||(statusFilter==='Con contraste detallado'&&d.review_level_display==='Contraste detallado')||(statusFilter==='Con análisis preliminar'&&d.review_level_display==='Análisis preliminar')||(statusFilter==='Solo inspección preliminar'&&d.review_level_display==='Inspección preliminar')||(statusFilter==='Sin registro'&&d.assessment_count===0)||(statusFilter==='No verificable'&&d.not_verifiable)||(statusFilter==='Con vínculo SDO'&&d.linked))&&[d.title,d.scan_status,d.verification_notes,d.category,d.review_finding].join(' ').toLowerCase().includes(query.toLowerCase()))},[data.documents,reviewedByDoc,data.evidence,statusFilter,query]);
   const withSDO=data.requests.filter(x=>String(x.sdo_reference||'').trim().length>0).length;
-  const filteredRequests=useMemo(()=>data.requests.filter(r=>(areaFilter==='Todas'||r.area===areaFilter)&&(statusFilter==='Todos'||(r.v07_classification||r.status)===statusFilter)&&[r.request_code,r.request_text,r.area,r.component,r.sdo_reference,r.gap_reference,r.comments,r.v07_classification].join(' ').toLowerCase().includes(query.toLowerCase())),[data.requests,areaFilter,statusFilter,query]);
-  const filteredSdo=useMemo(()=>data.sdo.filter(r=>(typeFilter==='Todos'||String(r.requirement_type||'').trim()===typeFilter)&&(statusFilter==='Todos'||(statusFilter.startsWith('V06: ')?r.v06_evaluation===statusFilter.slice(5):r.verification_status===statusFilter))&&[r.code,r.component,r.description,r.layer,r.stage,r.verification_status,r.notes,r.v06_evaluation].join(' ').toLowerCase().includes(query.toLowerCase())),[data.sdo,typeFilter,statusFilter,query]);
+  const filteredRequests=useMemo(()=>data.requests.filter(r=>(areaFilter==='Todas'||r.area===areaFilter)&&(statusFilter==='Todos'||(r.v07_classification||r.status)===statusFilter)&&[r.request_code,r.request_text,r.area,r.component,r.sdo_reference,r.gap_reference,r.comments,r.v07_classification,r.v07_basis,r.v07_contractual_evidence].join(' ').toLowerCase().includes(query.toLowerCase())),[data.requests,areaFilter,statusFilter,query]);
+  const filteredSdo=useMemo(()=>data.sdo.filter(r=>(typeFilter==='Todos'||String(r.requirement_type||'').trim()===typeFilter)&&(statusFilter==='Todos'||(statusFilter.startsWith('V06: ')?r.v06_evaluation===statusFilter.slice(5):r.verification_status===statusFilter))&&[r.code,r.component,r.description,r.layer,r.stage,r.verification_status,r.notes,r.v06_evaluation,r.v06_basis,r.v06_missing_validation].join(' ').toLowerCase().includes(query.toLowerCase())),[data.sdo,typeFilter,statusFilter,query]);
   const filteredDocs=useMemo(()=>data.documents.filter(r=>(typeFilter==='Todos'||r.category===typeFilter)&&(statusFilter==='Todos'||r.scan_status===statusFilter)&&[r.title,r.category,r.mime_type,r.verification_notes].join(' ').toLowerCase().includes(query.toLowerCase())),[data.documents,typeFilter,statusFilter,query]);
   const byArea=useMemo(()=>Object.entries(data.requests.reduce((m,r)=>(m[r.area||'Sin área']=(m[r.area||'Sin área']||0)+1,m),{})).sort((a,b)=>b[1]-a[1]),[data.requests]);
   const allStatus=useMemo(()=>[...new Set(data.documents.map(x=>x.scan_status))].sort(),[data.documents]);
   const docCat=useMemo(()=>[...new Set(data.documents.map(x=>x.category))].sort(),[data.documents]);
   const exportRows=()=>{
-    if(active==='nuevos')csv([['Código','Área','Solicitud','Componente','SDO','Clasificación V07 propuesta','Estado institucional'],...filteredRequests.map(x=>[x.request_code,x.area,x.request_text,x.component,x.sdo_reference,x.v07_classification,x.v07_proposal_status])],'clasificacion_v07.csv');
-    else if(active==='sdo')csv([['Código','Componente','Tipo','Descripción','Ciclo','Estado oficial','Evaluación V06','Estado de propuesta'],...filteredSdo.map(x=>[x.code,x.component,x.requirement_type,x.description,x.cycle,x.verification_status,x.v06_evaluation,x.v06_proposal_status])],'contraste_sdo_v06.csv');
+    if(active==='nuevos')csv(publicRedacted?[['Código','Área','Componente','SDO','Clasificación V07 propuesta','Estado de propuesta'],...filteredRequests.map(x=>[x.request_code,x.area,x.component,x.sdo_reference,x.v07_classification,x.v07_proposal_status])]:[['Código','Área','Solicitud original','Componente','SDO','Clasificación V07 propuesta','Fundamento V07','Evidencia contractual','Estado de propuesta'],...filteredRequests.map(x=>[x.request_code,x.area,x.request_text,x.component,x.sdo_reference,x.v07_classification,x.v07_basis,x.v07_contractual_evidence,x.v07_proposal_status])], 'clasificacion_v07.csv');
+    else if(active==='sdo')csv(publicRedacted?[['Código','Componente','Tipo','Ciclo','Evaluación V06 propuesta','Estado de propuesta'],...filteredSdo.map(x=>[x.code,x.component,x.requirement_type,x.cycle,x.v06_evaluation,x.v06_proposal_status])]:[['Código','Componente','Tipo','Descripción contractual','Ciclo','Estado oficial','Evaluación V06 propuesta','Fundamento V06','Pendiente de validación','Estado de propuesta'],...filteredSdo.map(x=>[x.code,x.component,x.requirement_type,x.description,x.cycle,x.verification_status,x.v06_evaluation,x.v06_basis,x.v06_missing_validation,x.v06_proposal_status])], 'contraste_sdo_v06.csv');
     else if(active==='auditoria')csv([['Documento','Tipo','Lectura registrada','Vínculo SDO','Nivel real','Registros','Hallazgo','Notas'],...auditRows.map(d=>[d.title,d.mime_type,d.scan_status,d.linked?'Sí':'No',d.review_level_display,d.assessment_count,d.review_finding,d.verification_notes])],'auditoria_cobertura_documental.csv');
     else if(active==='cobertura')csv([['Código SDO','Documento','Criterio','Cobertura documental','Hallazgo','Verificación pendiente','Fuente'],...filteredAssessments.map(a=>[a.sdo_code,a.document_title,a.criterion,a.coverage,a.finding,a.missing_validation,a.source_detail])],'contraste_sdo_evidencias.csv');
     else csv([['Documento','Categoría','Estado','Enlace','Observaciones'],...filteredDocs.map(x=>[x.title,x.category,x.scan_status,x.url,x.verification_notes])],'bitacora_documental.csv');
@@ -134,7 +142,9 @@ export default function App(){
     <main className="main">
       <div className="topbar"><button className="icon-button menu-button" onClick={()=>setMobile(true)}><Menu size={20}/></button><div className="top-path"><span>Programa EJE No Penal</span><ChevronRight size={14}/><b>{tabs.find(t=>t.id===active)?.label}</b></div><button className="outline-btn refresh" onClick={()=>refresh(institutionalToken)} disabled={loading}><RefreshCw size={15} className={loading?'spin':''}/> Actualizar</button><InstitutionalLogin identity={identity} onCredential={onCredential} onLogout={signOut}/></div>
       <div className="workspace">
+      {sessionNotice&&<div className="insight" role="status"><ShieldCheck size={18}/><div><b>Sesión institucional</b><p>{sessionNotice}</p></div></div>}
       {error&&<div className="error-banner"><AlertCircle size={18}/><span>{error}. Verifica la disponibilidad de Neon y la configuración del servidor.</span><button onClick={()=>refresh(institutionalToken)}>Reintentar</button></div>}
+      {data.generatedAt&&<div className="mini">Última consulta de registros: {new Date(data.generatedAt).toLocaleString('es-PE')}</div>}
       {publicRedacted&&active!=='resumen'&&<div className="insight"><ShieldCheck size={18}/><div><b>Consulta disponible · datos protegidos</b><p>Se muestran códigos, clasificaciones, cobertura y metadatos anonimizados de Neon. Las descripciones contractuales, los fundamentos técnicos, nombres y enlaces documentales permanecen reservados hasta verificar autorización individual. V06/V07 no equivalen a conformidades oficiales.</p></div></div>}
       <header className="page-header"><div><span className="eyebrow">CONTROL Y TRAZABILIDAD</span><h1>{tabs.find(t=>t.id===active)?.label}</h1><p>{active==='v2'?'Avance independiente de la auditoría documental, el cumplimiento SDO, las brechas, las solicitudes y la bolsa de horas.':active==='resumen'?'Corte integrado de V06, V07 y V08 basado en Neon y separado de conformidades oficiales.':active==='historico'?'Vista histórica sin estimaciones sustentadas ni detalles restringidos.':active==='sdo'?'Requisitos SDO codificados y dictámenes propuestos V06; el texto contractual original no se publica en modo anónimo.':active==='nuevos'?'Solicitudes clasificadas por V07. Las descripciones originales y condiciones individuales exigen acceso institucional.':active==='documentos'?'Inventario anonimizado por archivo; títulos y versiones están disponibles solo con acceso institucional.':active==='cobertura'?'Evaluaciones por documento y criterio SDO, diferenciando evidencia de conformidad.':active==='auditoria'?'Auditoría de inventario: vínculo documental no equivale a cumplimiento.':'Contraste de métodos para dimensionar la bolsa de horas y sus riesgos.'}</p></div><span className="live"><span className="green-dot"/> {loading?'Cargando':restricted?'Sin conexión de detalle':publicRedacted?'Datos anonimizados de Neon':'Consulta institucional autorizada'}</span></header>
       {active==='resumen'&&<V09Overview onNavigate={nav}/>}
