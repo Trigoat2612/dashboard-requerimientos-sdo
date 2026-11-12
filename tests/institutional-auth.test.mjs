@@ -175,7 +175,7 @@ test('evaluaciones paginadas: límite 200, metadatos y protección por token',as
       if(query.includes('COUNT(*)'))return [{total:352}];
       assert.match(query,/LIMIT/);
       assert.deepEqual(values,[200,200]);
-      return [{id:99,sdo_code:'RFA-ARQ-01',finding:'Hallazgo autorizado'}];
+      return Array.from({length:152},(_,i)=>({id:99+i,sdo_code:'RFA-ARQ-01',finding:'Hallazgo autorizado'}));
     }
   });
   try{
