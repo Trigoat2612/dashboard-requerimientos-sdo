@@ -36,7 +36,13 @@ async function get(path,{method='GET'}={}) {
 }
 
 function statusMust(v,expected,path) {
-  if(v.status !== expected) throw Error(`Smoke HTTP ${path}: ${v.status}, esperado ${expected}; Content-Type=${v.ct}`);
+  if(v.status !== expected){
+    if([301,302,303,307,308].includes(v.status)) {
+      const destination=v.location?new URL(v.location,base).hostname:'no revelado';
+      throw Error(`Smoke HTTP ${path}: redirección ${v.status} hacia ${destination}; el Preview requiere acceso autorizado. Configurar ejecución con identidad Vercel o bypass de automatización en secreto de GitHub, sin desactivar protección.`);
+    }
+    throw Error(`Smoke HTTP ${path}: ${v.status}, esperado ${expected}; Content-Type=${v.ct}`);
+  }
 }
 async function run() {
   await waitForGitDeployment();
