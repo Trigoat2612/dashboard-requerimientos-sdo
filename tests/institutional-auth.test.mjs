@@ -162,3 +162,51 @@ test('la API no utiliza otra base ni operaciones de escritura o claves compartid
   assert.doesNotMatch(code,/DASHBOARD_ACCESS_KEY/);
   assert.match(code,/ejenp_requerimientos_sdo\.sdo_requirements/);
 });
+
+test('evaluaciones paginadas: límite 200, metadatos y protección por token',async()=>{
+  const previous=process.env.DATABASE_URL;
+  process.env.DATABASE_URL='postgresql://test-only';
+  let calls=0;
+  const handler=createInstitutionalHandler({
+    authenticate:async()=>({email:'analista@pj.gob.pe',roles:['institutional_reader']}),
+    connect:()=>async(parts,...values)=>{
+      calls++;
+      const query=parts.join(' ');
+      if(query.includes('COUNT(*)'))return [{total:352}];
+      assert.match(query,/LIMIT/);
+      assert.deepEqual(values,[200,200]);
+      return [{id:99,sdo_code:'RFA-ARQ-01',finding:'Hallazgo autorizado'}];
+    }
+  });
+  try{
+    const accepted=res();
+    await handler({method:'GET',headers:{authorization:'Bearer token'},query:{view:'assessments',page:'2'}},accepted);
+    assert.equal(accepted.statusCode,200);
+    assert.equal(accepted.data.access,'institutional_verified');
+    assert.equal(accepted.data.page,2);
+    assert.equal(accepted.data.pageSize,200);
+    assert.equal(accepted.data.total,352);
+    assert.equal(accepted.data.hasMore,false);
+    assert.equal(accepted.data.rows[0].finding,'Hallazgo autorizado');
+    assert.equal(calls,2);
+    const invalid=res();
+    await handler({method:'GET',headers:{authorization:'Bearer token'},query:{view:'assessments',page:'0'}},invalid);
+    assert.equal(invalid.statusCode,400);
+    assert.equal(calls,2);
+    const anonymous=res();
+    await handler({method:'GET',headers:{},query:{view:'assessments',page:'1'}},anonymous);
+    assert.equal(anonymous.statusCode,401);
+    assert.equal(calls,2);
+  } finally {
+    if(previous===undefined)delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL=previous;
+  }
+});
+test('V09 no exporta fundamentos a la vista pública y gestiona sesión expirada',()=>{
+  const app=readFileSync(new URL('../src/App.jsx',import.meta.url),'utf8');
+  assert.match(app,/publicRedacted\?\[\['Código','Área','Componente'/);
+  assert.match(app,/x.v07_contractual_evidence/);
+  assert.match(app,/x.v06_missing_validation/);
+  assert.match(app,/setTimeout\(\(\)=>signOut/);
+  assert.match(app,/Tu sesión institucional expiró/);
+});
