@@ -1,8 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({error:'Método no permitido'});
-    if (!process.env.DASHBOARD_ACCESS_KEY) return res.status(503).json({error:'Control de acceso pendiente de configurar'});
-  if (req.headers?.authorization !== `Bearer ${process.env.DASHBOARD_ACCESS_KEY}`) return res.status(401).json({error:'Acceso no autorizado'});
   if (!process.env.DATABASE_URL) return res.status(503).json({error:'DATABASE_URL no está configurada'});
   try {
     const sql = neon(process.env.DATABASE_URL);
