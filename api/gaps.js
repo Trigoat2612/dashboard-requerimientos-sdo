@@ -3,6 +3,23 @@ import { neon } from '@neondatabase/serverless';
 // V09: el registro consolidado no existe en Neon ni ha sido aprobado.
 // Se puede consultar el conjunto de REFERENCIAS preliminares V07, separadas
 // formalmente del registro de brechas, sin exponer fundamentos ni documentos.
+export function buildPublicGapMetadata(candidates) {
+    return {
+      access: 'public_metadata_only',
+      registryStatus: 'not_migrated',
+      rows: [], // No registrar o inferir brechas desde V06 ni V07.
+      candidates: candidates.map(c => ({
+        request_code: c.request_code,
+        classification: c.classification,
+        sdo_codes: c.related_sdo_codes || [],
+        reference_ids: c.related_gap_ids || [],
+        proposal_status: c.proposal_status
+      })),
+      notice: 'Referencias preliminares V07: no son brechas consolidadas, verificadas ni aprobadas.',
+      generatedAt: new Date().toISOString()
+    };
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
   res.setHeader('Pragma', 'no-cache');
@@ -23,20 +40,7 @@ export default async function handler(req, res) {
       WHERE c.classification='Brecha existente'
       ORDER BY r.request_code
     `;
-    return res.status(200).json({
-      access: 'public_metadata_only',
-      registryStatus: 'not_migrated',
-      rows: [], // No registrar o inferir brechas desde V06 ni V07.
-      candidates: candidates.map(c => ({
-        request_code: c.request_code,
-        classification: c.classification,
-        sdo_codes: c.related_sdo_codes || [],
-        reference_ids: c.related_gap_ids || [],
-        proposal_status: c.proposal_status
-      })),
-      notice: 'Referencias preliminares V07: no son brechas consolidadas, verificadas ni aprobadas.',
-      generatedAt: new Date().toISOString()
-    });
+    return res.status(200).json(buildPublicGapMetadata(candidates));
   } catch {
     console.error('V09 gap metadata query failed');
     return res.status(500).json({ error: 'No se pudo consultar la clasificación de brechas' });
