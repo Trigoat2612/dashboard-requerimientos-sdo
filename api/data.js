@@ -74,6 +74,9 @@ export function buildPublicMetadata({ requests, sdo, documents, methods, evidenc
 // Mantener acceso público documental ya existente en main.
 // El nuevo detalle institucional permanece en /api/institutional-data con autenticación.
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control','private, no-store, max-age=0');
+  res.setHeader('Pragma','no-cache');
+  res.setHeader('X-Content-Type-Options','nosniff');
   if (req.method !== 'GET') return res.status(405).json({error:'Método no permitido'});
   if (!process.env.DATABASE_URL) return res.status(503).json({error:'DATABASE_URL no está configurada'});
   try {
