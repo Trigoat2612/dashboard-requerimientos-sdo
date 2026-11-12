@@ -100,7 +100,7 @@ export default function AuditV2() {
           {num(w.calibration_pending)>0&&<p className="v2-window-note">{fmt(w.calibration_pending)} calibraciones metodológicas pendientes (separadas de estimaciones)</p>}
         </div>)}</div>
       </section>
-      <div className="v2-footnote"><CheckCircle2 size={17}/><span>Fuente: agregados de Neon. Nuevos documentos en Hito 2.2: {fmt(d.inventory?.new_identities)} identidades. Información para seguimiento, no constituye conformidad ni autorización de pago.</span></div>
+      <div className="v2-footnote"><CheckCircle2 size={17}/><span>Fuente: agregados de Neon. Hito 2.2: {fmt(d.inventory?.files)} archivos y {fmt(d.inventory?.folders)} carpetas, con {fmt(d.inventory?.contrasted)} tareas contrastadas, {fmt(d.inventory?.duplicated)} duplicados verificados, {fmt(d.inventory?.in_progress)} en curso y {fmt(d.inventory?.pending)} pendientes. Estos estados no constituyen conformidad oficial ni autorización de pago.</span></div>
       <p className="v2-muted">Corte: {d.generatedAt?new Date(d.generatedAt).toLocaleString('es-PE',{timeZone:'America/Lima'}):'Sin dato'}.</p>
     </>}
   </div>;
