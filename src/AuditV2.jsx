@@ -79,7 +79,7 @@ export default function AuditV2() {
         <Group title="5. Bolsa de horas" description="WBS, IFPUG, COSMIC, SNAP e históricos verificables: sin horas atribuidas a obligaciones previas." icon={Calculator}>
           <div className="v2-figure">{fmt(newRequests)}<span> solicitudes propuestas como genuinamente nuevas</span></div>
           <div className="v2-facts"><span>Habilitadas para estimar tras contraste</span><b>{fmt(available.estimate_ready)}</b></div>
-          <div className="v2-methods">{['WBS','IFPUG','COSMIC','SNAP','Histórico verificable'].map(m=><div key={m}><b>{m}</b><span>{fmt(hours.find(x=>x.method===m)?.total)} estimaciones preliminares</span></div>)}</div>
+          <div className="v2-methods">{(d.methodGuidance||[]).map(g=><details key={g.method}><summary><b>{g.method}</b><span>{fmt(hours.find(x=>x.method===g.method)?.total)} estimaciones preliminares</span></summary><p><b>Aplicación:</b> {g.applicability}</p><p><b>Datos exigibles:</b> {g.required_inputs}</p><p><b>Control:</b> {g.validation_control}</p><p><b>Límite:</b> {g.limitations}</p></details>)}</div>
           <p className="v2-muted">No se suman metodologías alternativas como si fueran trabajos adicionales. La aprobación institucional se registra por separado.</p>
         </Group>
       </div>
