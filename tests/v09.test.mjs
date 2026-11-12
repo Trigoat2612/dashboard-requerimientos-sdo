@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { filterGaps, pageGaps, gapExportRows } from '../src/gap-model.js';
 import { escapeCsvCell, toSafeCsv } from '../src/csv-utils.js';
 import dataHandler, { buildPublicMetadata } from '../api/data.js';
-import gapsHandler from '../api/gaps.js';
+import gapsHandler, { buildPublicGapMetadata } from '../api/gaps.js';
 import updateHandler from '../api/update.js';
 
 const gaps = [
@@ -63,6 +63,7 @@ test('proyección pública conserva las clasificaciones y elimina contenidos ins
   assert.ok(!JSON.stringify(payload).includes(secret));
   assert.ok(!JSON.stringify(payload).includes('drive-original-secreto'));
   assert.ok(!JSON.stringify(payload).includes('internal.example'));
+  assert.ok(!JSON.stringify(payload).includes('999'));
 });
 test('endpoints de consulta aceptan GET, rechazan POST y no divulgan secretos ante error', async () => {
   const before = process.env.DATABASE_URL;
@@ -117,4 +118,38 @@ test('CSV conserva BOM y CRLF, neutraliza fórmulas y escapa comillas', () => {
   assert.ok(output.startsWith('\uFEFF'));
   assert.ok(output.includes('\r\n'));
   assert.ok(output.includes('"\'+payload"'));
+});
+
+test('candidatos de brechas son referencias V07, nunca brechas confirmadas', () => {
+  const sensitive = 'CONTRATO_RESERVADO_9';
+  const projected = buildPublicGapMetadata([{
+    request_code: 'REQ00100', classification:'Brecha existente',
+    related_sdo_codes:['RFU-01'], related_gap_ids:['BRE-164'],
+    proposal_status:'Propuesta, pendiente de aprobación', basis:sensitive,
+    contractual_evidence:sensitive, owner:sensitive
+  }]);
+  assert.equal(projected.access,'public_metadata_only');
+  assert.equal(projected.registryStatus,'not_migrated');
+  assert.deepEqual(projected.rows,[]);
+  assert.equal(projected.candidates.length,1);
+  assert.deepEqual(projected.candidates[0].reference_ids,['BRE-164']);
+  assert.ok(!JSON.stringify(projected).includes(sensitive));
+  assert.match(projected.notice,/no son brechas consolidadas/i);
+});
+test('paneles de lectura anonimizados habilitados sin contraseñas compartidas', () => {
+  const app=readFileSync(new URL('../src/App.jsx',import.meta.url),'utf8');
+  assert.match(app,/public_metadata_only/);
+  assert.match(app,/publicRedacted/);
+  assert.match(app,/Ficha de consulta/);
+  assert.doesNotMatch(app,/Acceso a datos institucionales no habilitado/);
+  const summary=readFileSync(new URL('../api/v2-summary.js',import.meta.url),'utf8');
+  assert.doesNotMatch(summary,/methods_count::int AS total, total_min/);
+  assert.match(summary,/lease_expires_at > NOW\(\)/);
+  const publicApi=readFileSync(new URL('../api/data.js',import.meta.url),'utf8');
+  assert.doesNotMatch(publicApi,/DASHBOARD_ACCESS_KEY/);
+});
+test('explorador de brechas incluye adaptación responsive definida', () => {
+  const css=readFileSync(new URL('../src/styles.css',import.meta.url),'utf8');
+  assert.match(css, /@media\(max-width:630px\)/);
+  assert.match(css, /\.gap-explorer \.toolbar/);
 });
