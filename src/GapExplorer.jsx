@@ -50,7 +50,7 @@ export default function GapExplorer({ onOpenSdo, onOpenRequest }) {
   const canSeeDetails = store.access === 'institutional_verified';
   const components = useMemo(() => unique(rows, 'component'), [rows]);
 
-  return <section>
+  return <section className="gap-explorer">
     <div className="panel">
       <h2>Registro consolidado de brechas</h2>
       <p className="muted">Separa hallazgos sustentados, obligaciones pendientes, defectos, insuficiencia de evidencia y mejoras fuera de SDO. No genera brechas automáticamente a partir de V06.</p>
