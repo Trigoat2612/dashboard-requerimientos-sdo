@@ -12,7 +12,7 @@ export default async function handler(req, res) {
       sql`SELECT status, count(*)::int AS total FROM ejenp_requerimientos_sdo.review_queue_parallel WHERE task_kind='DOCUMENTO' GROUP BY status ORDER BY status`,
       sql`SELECT proposed_evaluation AS classification, total::int FROM ejenp_requerimientos_sdo.audit_v2_compliance_counts ORDER BY proposed_evaluation`,
       sql`SELECT classification, total::int FROM ejenp_requerimientos_sdo.audit_v2_classification_counts ORDER BY classification`,
-      sql`SELECT method, methods_count::int AS total, total_min, total_expected, total_max FROM ejenp_requerimientos_sdo.audit_v2_hours_counts ORDER BY method`,
+      sql`SELECT method, methods_count::int AS total FROM ejenp_requerimientos_sdo.audit_v2_hours_counts ORDER BY method`,
       sql`SELECT count(*)::int AS total, count(*)::int AS new_identities, count(*) FILTER (WHERE i.mime_type<>'application/vnd.google-apps.folder')::int AS files, count(*) FILTER (WHERE i.mime_type='application/vnd.google-apps.folder')::int AS folders, count(*) FILTER (WHERE q.status='Contrastado')::int AS contrasted, count(*) FILTER (WHERE q.status='Duplicado verificado')::int AS duplicated, count(*) FILTER (WHERE q.status='En curso')::int AS in_progress, count(*) FILTER (WHERE q.status='Pendiente')::int AS pending FROM ejenp_requerimientos_sdo.drive_inventory_discovery i LEFT JOIN ejenp_requerimientos_sdo.review_queue_parallel q ON q.document_id=i.document_id WHERE i.root_id='1c_MhCpiG62IyyH8pl_dU-GEqaqiInn9T'`,
       sql`SELECT (SELECT count(*)::int FROM ejenp_requerimientos_sdo.review_queue_parallel q WHERE task_kind='REQUISITO_SDO' AND status='Pendiente' AND EXISTS(SELECT 1 FROM ejenp_requerimientos_sdo.document_assessments a WHERE a.sdo_code=q.requirement_code AND a.review_level='Análisis documental contrastado')) AS sdo_ready,
              (SELECT count(*)::int FROM ejenp_requerimientos_sdo.request_analysis_queue q WHERE q.task_type='ESTIMACION' AND q.status='Pendiente' AND EXISTS(SELECT 1 FROM ejenp_requerimientos_sdo.request_classification_proposals c WHERE c.request_id=q.request_id AND c.classification='Genuinamente nueva' AND c.proposal_status='Propuesta, pendiente de aprobación') AND EXISTS(SELECT 1 FROM ejenp_requerimientos_sdo.request_analysis_queue p WHERE p.request_id=q.request_id AND p.task_type='CLASIFICACION' AND p.status='Contrastado')) AS estimate_ready,
@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store, max-age=0');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     return res.status(200).json({
-      overview: overview[0] || {},
+      overview: { ...(overview[0] || {}), active_reservations: [...activeByWindow.values()].reduce((n,v)=>n+v,0) },
       windows: windows.map(w => ({
         ...w, activeReservations: activeByWindow.get(w.window_id) || 0
       })),
@@ -50,7 +50,7 @@ export default async function handler(req, res) {
       disclaimer: 'Propuestas y evaluaciones preliminares. No son aprobaciones institucionales.'
     });
   } catch (error) {
-    console.error('No se pudo consultar resumen V2:', error?.message);
+    console.error('No se pudo consultar resumen V2');
     return res.status(500).json({ error: 'No se pudo consultar el resumen de auditoría en Neon' });
   }
 }
