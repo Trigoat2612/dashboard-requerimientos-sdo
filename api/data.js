@@ -28,7 +28,16 @@ export default async function handler(req, res) {
     const sensitive=/(?:pentest|ethical.?hacking|vulnerabilit|retest|rat[ -]+pentest|expedientes? sin (?:estado|partes)|resumenincidenciaspruebas|log de errores|listadodeexpedientes|registro_usuarios|usuarios_dia_)/i;
     const checkedDocuments=publicDocuments.map(d=>sensitive.test(d.title||'')?{...d,url:null,verification_notes:'Documento con datos o detalles restringidos. La evaluación pública omite identificadores y contenido sensible.'}:d);
     const checkedEvidence=publicEvidence.map(e=>sensitive.test(e.document_title||'')?{...e,document_url:null,rationale:'Referencia documental registrada. Acceso institucional restringido.'}:e);
-    const publicAssessments=assessments.map(a=>({...a,document_url:sensitive.test(a.document_title||'')?null:a.document_url,document_title:reserved.test(a.document_title||'')?'Evaluación de seguridad reservada':a.document_title}));
+    const publicAssessments=assessments.map(a=>{
+      const isRestricted=sensitive.test(a.document_title||'');
+      return isRestricted?{...a,
+        document_url:null,
+        document_title:reserved.test(a.document_title||'')?'Evaluación de seguridad reservada':a.document_title,
+        finding:'Evaluación documental registrada. La información detallada requiere autorización institucional y no se divulga en el dashboard público.',
+        missing_validation:'Consultar evidencia, subsanaciones y conformidad mediante los canales institucionales autorizados.',
+        source_detail:'Metadatos de revisión (detalle reservado).'
+      }:a;
+    });
     return res.status(200).json({requests,sdo,documents:checkedDocuments,methods,evidence:checkedEvidence,suggestions,assessments:publicAssessments,generatedAt:new Date().toISOString()});
   } catch (error) {
     console.error('DB read failed', error?.message);
