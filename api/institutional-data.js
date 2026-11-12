@@ -33,14 +33,22 @@ export function createInstitutionalHandler({
           requirements,compliance,requests,classifications,documents,methods,evidence,assessments,estimateCounts
         }));
       }
-      // Paginación lógica por demanda: evita respuestas de varios MB en el dashboard.
-      // Evaluaciones completas se obtienen únicamente al abrir auditoría/contraste.
+      // Carga incremental de evaluaciones: sin respuestas monolíticas ni exposición de JWT en URL.
       if (view==='assessments') {
-        const rows=await sql`SELECT a.id,a.document_id,a.sdo_code,a.criterion,a.coverage,a.finding,a.missing_validation,
-          a.source_detail,a.review_level,a.reviewed_at,d.title AS document_title,d.url AS document_url
-          FROM ejenp_requerimientos_sdo.document_assessments a
-          LEFT JOIN ejenp_requerimientos_sdo.source_documents d ON d.id=a.document_id ORDER BY a.id DESC`;
-        return res.status(200).json({access:'institutional_verified',rows,generatedAt:new Date().toISOString()});
+        const page=Number(req.query?.page??1);
+        const pageSize=200;
+        if(!Number.isSafeInteger(page)||page<1||page>10000) return res.status(400).json({error:'Página fuera de rango'});
+        const offset=(page-1)*pageSize;
+        const [rows, count]=await Promise.all([
+          sql`SELECT a.id,a.document_id,a.sdo_code,a.criterion,a.coverage,a.finding,a.missing_validation,
+            a.source_detail,a.review_level,a.reviewed_at,d.title AS document_title,d.url AS document_url
+            FROM ejenp_requerimientos_sdo.document_assessments a
+            LEFT JOIN ejenp_requerimientos_sdo.source_documents d ON d.id=a.document_id
+            ORDER BY a.id DESC LIMIT ${pageSize} OFFSET ${offset}`,
+          sql`SELECT COUNT(*)::int AS total FROM ejenp_requerimientos_sdo.document_assessments`
+        ]);
+        const total=Number(count[0]?.total||0);
+        return res.status(200).json({access:'institutional_verified',rows,page,pageSize,total,hasMore:offset+rows.length<total,generatedAt:new Date().toISOString()});
       }
       if (view==='detail') {
         const kind=req.query?.kind, id=req.query?.id;
