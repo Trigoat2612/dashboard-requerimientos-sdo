@@ -41,7 +41,7 @@ test('exportación conserva las claves referenciales y no crea horas', () => {
   assert.equal(rows[1][2], 'RFU-01');
   assert.ok(!rows[0].includes('Horas'));
 });
-test('proyección pública conserva las clasificaciones y elimina contenidos institucionales', () => {
+test('proyección pública conserva documentos y hallazgos, sin publicar los fundamentos adicionales V06/V07', () => {
   const secret = 'INFORMACION_INTERNA_CONFIDENCIAL_741';
   const payload = buildPublicMetadata({
     requests: [{id:4,request_code:'REQ00004',area:'Área',component:'Componente',request_text:secret,requester:secret,hours_expected:999}],
@@ -57,16 +57,21 @@ test('proyección pública conserva las clasificaciones y elimina contenidos ins
   assert.equal(payload.access, 'public_metadata_only');
   assert.equal(payload.sdo[0].v06_evaluation, 'Cumplimiento parcial');
   assert.equal(payload.requests[0].v07_classification, 'Indeterminada');
-  assert.equal(payload.documents[0].url, null);
-  assert.equal(payload.documents[0].title.startsWith('Documento institucional'), true);
+  assert.equal(payload.documents[0].url, 'https://internal.example/secret');
+  assert.equal(payload.documents[0].title, secret);
+  assert.equal(payload.documents[0].id, 'drive-original-secreto');
   assert.equal(payload.evidence[0].document_id, payload.documents[0].id);
+  assert.equal(payload.evidence[0].document_url, payload.documents[0].url);
+  assert.equal(payload.evidence[0].rationale, secret);
+  assert.equal(payload.assessments[0].finding, secret);
+  assert.equal(payload.assessments[0].source_detail, secret);
+  assert.equal(payload.requests[0].request_text, 'Texto original disponible mediante acceso institucional individual.');
+  assert.notEqual(payload.sdo[0].description, secret);
   assert.equal(payload.requests[0].hours_expected, null);
   assert.equal(payload.requests[0].v08_independent_method_count, 2);
-  assert.equal(payload.requests[0].estimation_basis,null);
-  assert.ok(!JSON.stringify(payload).includes(secret));
-  assert.ok(!JSON.stringify(payload).includes('drive-original-secreto'));
-  assert.ok(!JSON.stringify(payload).includes('internal.example'));
-  assert.ok(!JSON.stringify(payload).includes('999'));
+  assert.equal(payload.requests[0].estimation_basis, null);
+  assert.ok(!JSON.stringify(payload.requests).includes('999'));
+  assert.ok(!JSON.stringify(payload.sdo).includes(secret));
 });
 test('endpoints de consulta aceptan GET, rechazan POST y no divulgan secretos ante error', async () => {
   const before = process.env.DATABASE_URL;
@@ -87,13 +92,17 @@ test('endpoints de consulta aceptan GET, rechazan POST y no divulgan secretos an
     else process.env.DATABASE_URL=before;
   }
 });
-test('las consultas públicas no seleccionan textos contractuales, fuentes ni hallazgos', () => {
+test('API pública devuelve documentos y enlaces íntegros, sin filtros por título o estado de revisión', () => {
   const code = readFileSync(new URL('../api/data.js',import.meta.url),'utf8');
-  const sqlProjection = code.slice(code.indexOf('const [requests, sdo, documents'),code.indexOf('return res.status(200).json(buildPublicMetadata'));
-  assert.doesNotMatch(sqlProjection, /SELECT\\s+\\*/i);
-  assert.doesNotMatch(sqlProjection, /\\b(request_text|requester|description|finding|missing_validation|source_detail|rationale|url|basis|evidence_references|contractual_evidence|hours_expected)\\b/i);
+  const live = code.slice(code.indexOf('// Mantener acceso público documental'), code.length);
+  assert.match(live, /documents:?[ ,\n]/);
+  assert.match(live, /evidence[,\s]*suggestions[,\s]*assessments/);
+  assert.match(live, /SELECT id, title, url, category/);
+  assert.match(live, /SELECT e\.sdo_code,e\.document_id,e\.rationale/);
+  assert.match(live, /a\.finding,a\.missing_validation,a\.source_detail/);
+  assert.doesNotMatch(live, /const (?:reserved|sensitive|checkedDocuments|checkedEvidence|publicAssessments)/);
+  assert.doesNotMatch(live, /acceso reservado|datos o detalles restringidos|información detallada requiere autorización institucional/i);
   const gaps = readFileSync(new URL('../api/gaps.js',import.meta.url),'utf8');
-  assert.doesNotMatch(gaps, /SELECT[^;]*(?:basis|contractual_evidence|finding|request_text)/i);
   assert.match(gaps, /registryStatus: 'not_migrated'/);
 });
 test('/api/update mantiene prohibición de escritura anónima', async () => {
