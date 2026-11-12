@@ -96,7 +96,7 @@ export default function InstitutionalDetailPanel({token,kind,id,onNavigate,onUna
     </>}
     {r&&kind==='document'&&<>
       <h3>Documento fuente</h3>
-      <Note label="Título y versión registrada" value={[r.title,r.modified_at].filter(Boolean).join(' · ')}/>
+      <Note label="Título original" value={r.title}/><Note label="Última modificación registrada (no equivale a versión formal)" value={r.modified_at}/>
       <Note label="Estado y observaciones" value={[r.scan_status,r.verification_notes].filter(Boolean).join(' · ')}/>
       {safeUrl(r.url)&&<a href={r.url} target="_blank" rel="noopener noreferrer" className="doc-link">Abrir documento original</a>}
     </>}
