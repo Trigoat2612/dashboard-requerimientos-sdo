@@ -13,7 +13,18 @@ export default async function handler(req, res) {
       sql`SELECT a.proposed_requirement_id,a.sdo_code,a.similarity,a.rationale,a.review_status,s.component,s.description FROM ejenp_requerimientos_sdo.association_suggestions a JOIN ejenp_requerimientos_sdo.sdo_requirements s ON s.code=a.sdo_code ORDER BY a.proposed_requirement_id,a.similarity DESC`
     ]);
     res.setHeader('Cache-Control','no-store, max-age=0');
-    return res.status(200).json({requests,sdo,documents,methods,evidence,suggestions,generatedAt:new Date().toISOString()});
+    // El dashboard no requiere clave, por ello los informes clasificados como
+    // confidenciales se muestran únicamente como referencias de revisión.
+    const reserved = /(?:pentest|ethical.?hacking|vulnerabilit|vulnerabilidades|retest|rat[ -]+pentest)/i;
+    const publicDocuments = documents.map(d => reserved.test(d.title || '') ? {
+      ...d, title: 'Informe técnico de seguridad (acceso reservado)',
+      url: null, verification_notes: 'Existe evidencia de evaluación de seguridad. El informe detallado es confidencial y debe consultarse por canales institucionales autorizados.'
+    } : d);
+    const publicEvidence = evidence.map(e => reserved.test(e.document_title || '') ? {
+      ...e, document_title: 'Informe técnico de seguridad (acceso reservado)', document_url: null,
+      rationale: 'Referencia documental de seguridad registrada. Evidencia técnica detallada de acceso restringido.'
+    } : e);
+    return res.status(200).json({requests,sdo,documents:publicDocuments,methods,evidence:publicEvidence,suggestions,generatedAt:new Date().toISOString()});
   } catch (error) {
     console.error('DB read failed', error?.message);
     return res.status(500).json({error:'No se pudieron recuperar los datos de Neon'});
