@@ -84,8 +84,21 @@ export default function AuditV2() {
           <p className="v2-muted">No se suman metodologías alternativas como si fueran trabajos adicionales. La aprobación institucional se registra por separado.</p>
         </Group>
       </div>
-      <section className="v2-windows"><div className="v2-group-header"><GitBranch size={19}/><div><h2>Ventanas de trabajo V00–V08</h2><p>Compartición segura de tareas. V01–V05 consultan la misma cola documental, no cinco inventarios diferentes.</p></div></div>
-        <div className="v2-window-grid">{(d.windows||[]).map(w=><div className="v2-window" key={w.window_id}><b>{w.window_id}</b><div><strong>{w.specialty}</strong><small>{w.workstream}</small></div><span className={w.enabled?'v2-ok':'v2-off'}>{w.enabled?'Habilitada':'Deshabilitada'}</span><small>{fmt(w.activeReservations)} reservas activas</small></div>)}</div>
+      <section className="v2-windows"><div className="v2-group-header"><GitBranch size={19}/><div><h2>Ventanas de trabajo V00–V08</h2><p>Avance específico por ventana, sin repetir los totales globales. Las propuestas pendientes de validación institucional se muestran por separado.</p></div></div>
+        <div className="v2-window-grid">{(d.windows||[]).map(w=><div className="v2-window" key={w.window_id}>
+          <b>{w.window_id}</b><div><strong>{w.specialty}</strong><small>{w.workstream}</small></div>
+          <span className={w.enabled?'v2-ok':'v2-off'}>{w.enabled?'Habilitada':'Deshabilitada'}</span>
+          <small>{fmt(w.activeReservations)} reservas activas</small>
+          <div className="v2-window-metrics">
+            <span>Pendientes <b>{fmt(w.pending)}</b></span>
+            <span>En curso <b>{fmt(w.in_progress)}</b></span>
+            <span>Contrastadas <b>{fmt(w.contrasted)}</b></span>
+            <span>Duplicadas <b>{fmt(w.duplicated)}</b></span>
+            <span>Bloqueadas <b>{fmt(w.blocked)}</b></span>
+          </div>
+          {num(w.pending_institutional_validation)>0&&<p className="v2-window-note">{fmt(w.pending_institutional_validation)} propuestas en espera de validación institucional, sin conformidad oficial</p>}
+          {num(w.calibration_pending)>0&&<p className="v2-window-note">{fmt(w.calibration_pending)} calibraciones metodológicas pendientes (separadas de estimaciones)</p>}
+        </div>)}</div>
       </section>
       <div className="v2-footnote"><CheckCircle2 size={17}/><span>Fuente: agregados de Neon. Nuevos documentos en Hito 2.2: {fmt(d.inventory?.new_identities)} identidades. Información para seguimiento, no constituye conformidad ni autorización de pago.</span></div>
       <p className="v2-muted">Corte: {d.generatedAt?new Date(d.generatedAt).toLocaleString('es-PE',{timeZone:'America/Lima'}):'Sin dato'}.</p>
