@@ -38,6 +38,7 @@ export default function AuditV2() {
   const available = d?.availability || {};
   const docs = num(x.files_total);
   const docTasks = d?.documental?.reduce((s,r)=>s+num(r.total),0)||0;
+  const documentTreatments = num(x.files_closed_queue) + num((d?.documental||[]).find(r=>r.status==='Duplicado verificado')?.total);
   const compliance = Object.fromEntries((d?.compliance || []).map(r=>[r.classification,num(r.total)]));
   const classified = (d?.classification || []).reduce((s,r)=>s+num(r.total),0);
   const newRequests = num((d?.classification||[]).find(r=>r.classification==='Genuinamente nueva')?.total);
@@ -56,7 +57,7 @@ export default function AuditV2() {
       </div>
       <div className="v2-groups">
         <Group title="1. Avance documental" description="La cola documental es independiente de las evidencias por requisito." icon={FileText}>
-          <Meter label="Tareas documentales cerradas en la cola" value={x.files_closed_queue} total={docTasks}/>
+          <Meter label="Contrastadas o con duplicidad verificada en cola" value={documentTreatments} total={docTasks}/>
           <div className="v2-facts"><span>Con al menos un criterio contrastado</span><b>{fmt(available.docs_with_any_contrast)} archivos</b></div>
           <div className="v2-facts"><span>Criterios documentales contrastados</span><b>{fmt(available.assessment_criteria_contrasted)}</b></div>
           <div className="v2-facts"><span>Pendientes / en curso</span><b>{fmt(x.files_pending)} / {fmt(x.files_in_progress)}</b></div>
