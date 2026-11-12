@@ -33,7 +33,10 @@ export function buildPublicMetadata({ requests, sdo, documents, methods, evidenc
       sdo: sdo.map(r => {
         const c = bySdo.get(r.code);
         return {
-          ...r, description: restricted, verification_status: 'Estado oficial no publicado',
+          code: r.code, stage: r.stage, layer: r.layer, component: r.component,
+          requirement_type: r.requirement_type, cycle: r.cycle,
+          progress_reported: r.progress_reported, progress_route_count: r.progress_route_count,
+          description: restricted, verification_status: 'Estado oficial no publicado',
           notes: null, progress_basis: null,
           v06_evaluation: c?.proposed_evaluation || null,
           v06_proposal_status: c?.proposal_status || null, v06_reviewed_at: c?.reviewed_at || null
