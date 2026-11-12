@@ -55,3 +55,28 @@ Los números se leen desde Neon y evolucionan a medida que V00–V08 registran n
 - `api/v2-summary.js` omite el agregado de esfuerzo de estimaciones V08 en modo público, calcula reservas vigentes por `lease_expires_at` y mantiene triaje histórico separado.
 - La migración DDL sigue pendiente de autorización. No hay escritura ni nuevas tablas.
 - Detalle de pruebas, incidencias, conciliación y bloqueos: `docs/v09-bloque-3.md`.
+
+## V09 · Acceso institucional individual (sin contraseñas compartidas)
+
+La consulta pública **permanece anonimizada** en `/api/data`. El nuevo flujo de acceso institucional utiliza Google Identity Services y validación de ID token Google OIDC **en el servidor**, comprobando RS256, clave pública JWKS, emisor, audiencia, caducidad, correo verificado y lista nominativa de correos autorizados.
+
+**Configurar exclusivamente en Vercel Preview** del proyecto existente:
+- `GOOGLE_OIDC_CLIENT_ID`: Client ID de una aplicación web OAuth 2.0 de Google. No es un secreto; debe corresponder exactamente a la audiencia del token firmado.
+- `INSTITUTIONAL_ALLOWED_EMAILS`: correos individuales expresamente aprobados, separados por comas. **No** habilitar acceso mediante dominio completo o un comodín.
+- `DATABASE_URL`: cadena existente de lectura/conexión a Neon. Nunca transmitirla al navegador ni al repositorio.
+
+En Google Cloud Console, registrar el origen JavaScript **HTTPS** del Preview que servirá el inicio de sesión. Si se pretende habilitar más dominios, cada uno requiere la configuración de origen correspondiente y autorización. No se requiere OAuth Client Secret para la verificación de ID tokens de Google Identity Services.
+
+**Endpoints:**
+- `GET /api/auth-config`: solo `enabled` y client ID público; no devuelve allowlist.
+- `POST /api/auth-session`: valida la credencial Google y devuelve solo identidad/rol de lectura.
+- `GET /api/institutional-data?view=dashboard`: carga SDO, V06, V07, títulos/vínculos documentales, metodologías y metadatos de evaluaciones. Requiere `Authorization: Bearer <Google_ID_Token>`.
+- `GET /api/institutional-data?view=detail&kind=sdo|request|document|assessment&id=<id>`: ficha original, fundamento, condiciones de validación, enlaces y evidencias relacionadas. Requiere autenticación individual.
+- `GET /api/institutional-data?view=assessments`: obtiene hallazgos y pendientes documentales completos únicamente cuando se abre el módulo correspondiente.
+- `POST /api/update` permanece 403, y la API institucional no tiene operaciones de escritura.
+
+Los tokens solo se mantienen en la memoria React: no se almacenan en `localStorage`, cookies ni en el servidor. Al cerrar sesión se vacía inmediatamente el estado con datos institucionales.
+
+**Importante:** el código y las pruebas no habilitan por sí solos cuentas reales. Sin estas dos variables de identidad, el inicio de sesión aparece como no configurado, y la consulta original permanece reservada. Es obligatorio probar con una cuenta allowlisted y otra no autorizada en Vercel Preview antes de proponer producción. No se habilitó Neon Auth ni se crearon esquemas.
+
+**Pruebas:** `npm test` valida tokens firmados (RSA/JWKS con llave de prueba), audiencia/emisor/expiración, deny-list implícita, ausencia de sesión, rol, proyecciones institucionales y solicitud protegida con un adaptador de Neon simulado. La prueba con cuenta Google real exige la configuración antes indicada.
