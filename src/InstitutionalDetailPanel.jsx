@@ -63,6 +63,7 @@ export default function InstitutionalDetailPanel({token,kind,id,onNavigate,onUna
       <Note label="Referencias de evidencia" value={d.compliance?.evidence_references}/>
       <Note label="Comprobaciones y condiciones pendientes" value={d.compliance?.missing_validation}/>
       <Note label="Estado de propuesta" value={d.compliance?.proposal_status}/>
+      <Note label="Analista V06 / fecha" value={[d.compliance?.proposed_by,d.compliance?.reviewed_at].filter(Boolean).join(' · ')}/>
     </>}
     {r&&kind==='request'&&<>
       <h3>Solicitud original</h3>
@@ -77,9 +78,11 @@ export default function InstitutionalDetailPanel({token,kind,id,onNavigate,onUna
       <Note label="Requisitos SDO relacionados" value={d.classification?.related_sdo_codes}/>
       <Note label="Brechas referenciadas, no confirmadas" value={d.classification?.related_gap_ids}/>
       <Note label="Estado institucional de la propuesta" value={d.classification?.proposal_status}/>
+      <Note label="Analista V07 / fecha" value={[d.classification?.proposed_by,d.classification?.reviewed_at].filter(Boolean).join(' · ')}/>
       <h3>Condiciones operativas y desbloqueo</h3>
-      {(d.queue||[]).map((q,i)=><div key={i} className="institutional-note"><b>{q.task_type} · {q.status}</b><p>{txt(q.notes)}</p></div>)}
-      {!d.queue?.length&&<p>Sin tareas adicionales registradas.</p>}
+      {(d.queue||[]).map((q,i)=><div key={i} className="institutional-note"><b>{q.task_type} · {q.status}</b><p>Responsable/ventana: {txt(q.assigned_window)} · Actualizado: {txt(q.updated_at)}</p><p>{txt(q.notes)}</p></div>)}
+      {!d.queue?.length&&<p>No se registraron tareas adicionales de aclaración o estimación.</p>}
+      <p className="muted">Las tareas de la cola son referencias operativas; solo una evaluación V08 registrada constituye una estimación independiente.</p>
       <h3>Estimaciones independientes V08</h3>
       {!d.estimates?.length&&<p>No hay estimaciones independientes registradas. El triaje histórico no constituye aprobación.</p>}
       {(d.estimates||[]).map((e,i)=><details className="institutional-assessment" key={i}><summary>{e.method} · {e.proposal_status||'Propuesta'}</summary>
