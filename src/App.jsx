@@ -1,8 +1,10 @@
 import React, {useEffect,useMemo,useState} from 'react';
+import AuditV2 from './AuditV2.jsx';
 import {Activity,BookOpen,ClipboardList,FileText,Layers,Calculator,Search,RefreshCw,ExternalLink,ChevronRight,CheckCircle2,AlertCircle,Menu,X,Save,Download,Database,Filter,ShieldCheck,Clock3} from 'lucide-react';
 
 const tabs=[
   {id:'resumen',label:'Resumen ejecutivo',icon:Activity},
+  {id:'v2',label:'Auditoría Integral V2',icon:ShieldCheck},
   {id:'sdo',label:'Matriz de requisitos SDO',icon:BookOpen},
   {id:'nuevos',label:'Nuevos requerimientos',icon:ClipboardList},
   {id:'documentos',label:'Bitácora documental',icon:FileText},
@@ -77,7 +79,8 @@ export default function App(){
       <div className="topbar"><button className="icon-button menu-button" onClick={()=>setMobile(true)}><Menu size={20}/></button><div className="top-path"><span>Programa EJE No Penal</span><ChevronRight size={14}/><b>{tabs.find(t=>t.id===active)?.label}</b></div><button className="outline-btn refresh" onClick={refresh} disabled={loading}><RefreshCw size={15} className={loading?'spin':''}/> Actualizar</button><span className="mini">Consulta · solo lectura</span></div>
       <div className="workspace">
       {error&&<div className="error-banner"><AlertCircle size={18}/><span>{error}. Verifica la disponibilidad de Neon y la configuración del servidor.</span><button onClick={refresh}>Reintentar</button></div>}
-      <header className="page-header"><div><span className="eyebrow">CONTROL Y TRAZABILIDAD</span><h1>{tabs.find(t=>t.id===active)?.label}</h1><p>{active==='resumen'?'Visión consolidada del alcance contractual, brechas y esfuerzo potencial.':active==='sdo'?'Requisitos codificados extraídos de la matriz SDO, con su clasificación original.':active==='nuevos'?'68 candidatos filtrados del backlog. Asociaciones y horas sujetas a validación.':active==='documentos'?'Evidencia documental por archivo, incluyendo imágenes y limitaciones de validación.':active==='cobertura'?'Evaluaciones por documento y criterio SDO, diferenciando evidencia de conformidad.':active==='auditoria'?'Auditoría de inventario: vínculo documental no equivale a cumplimiento.':'Contraste de métodos para dimensionar la bolsa de horas y sus riesgos.'}</p></div><span className="live"><span className="green-dot"/> {loading?'Cargando':'Datos de Neon'}</span></header>
+      <header className="page-header"><div><span className="eyebrow">CONTROL Y TRAZABILIDAD</span><h1>{tabs.find(t=>t.id===active)?.label}</h1><p>{active==='v2'?'Avance independiente de la auditoría documental, el cumplimiento SDO, las brechas, las solicitudes y la bolsa de horas.':active==='resumen'?'Visión consolidada del alcance contractual, brechas y esfuerzo potencial.':active==='sdo'?'Requisitos codificados extraídos de la matriz SDO, con su clasificación original.':active==='nuevos'?'68 candidatos filtrados del backlog. Asociaciones y horas sujetas a validación.':active==='documentos'?'Evidencia documental por archivo, incluyendo imágenes y limitaciones de validación.':active==='cobertura'?'Evaluaciones por documento y criterio SDO, diferenciando evidencia de conformidad.':active==='auditoria'?'Auditoría de inventario: vínculo documental no equivale a cumplimiento.':'Contraste de métodos para dimensionar la bolsa de horas y sus riesgos.'}</p></div><span className="live"><span className="green-dot"/> {loading?'Cargando':'Datos de Neon'}</span></header>
+      {active==='v2'&&<AuditV2/>}
       {active==='resumen'&&<><section className="stat-grid">
         <Stat icon={ClipboardList} label="Candidatos de backlog" value={format(data.requests.length)} desc="Aún no son desarrollos aprobados"/>
         <Stat icon={BookOpen} label="Requisitos funcionales" value={format(data.sdo.filter(r=>/funcional/i.test(r.requirement_type||'')&&!/no funcional/i.test(r.requirement_type||'')).length)} desc="Matriz SDO"/>
