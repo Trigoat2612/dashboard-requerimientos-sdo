@@ -11,3 +11,24 @@
 .panel-heading{flex-wrap:wrap}
 .panel .methods-grid>.outline-btn{max-width:100%;overflow-wrap:anywhere;white-space:normal;height:auto;min-height:42px;padding:10px;text-align:left}
 @media(max-width:630px){.gap-explorer .toolbar{display:grid;grid-template-columns:minmax(0,1fr)}.gap-explorer .toolbar .search{grid-column:1}.gap-explorer .toolbar>input,.gap-explorer .toolbar>select{width:100%;min-width:0;max-width:100%}.gap-explorer .toolbar>.outline-btn{grid-column:1}.gap-explorer .pager{flex-wrap:wrap;gap:10px}}
+
+/* V09 · Acceso institucional y fichas auditables */
+.institutional-login{display:flex;gap:9px;align-items:center;flex-wrap:wrap;max-width:390px;justify-content:flex-end}
+.institutional-user{font-size:11px;font-weight:700;color:#276b76;display:inline-flex;align-items:center;gap:6px;max-width:240px;overflow-wrap:anywhere}
+.institutional-login .mini{display:flex;gap:6px;align-items:center;max-width:250px;line-height:1.4}
+.institutional-login .auth-error{color:#a43842}
+.institutional-detail{margin-top:20px;overflow-wrap:anywhere}
+.institutional-detail h3{font-size:14px;color:#244867;margin:23px 0 13px}
+.institutional-detail .panel-heading p{display:flex;gap:8px;align-items:center}
+.institutional-note{padding:11px 13px;background:#f8fbfe;border:1px solid #e5edf5;border-radius:9px;margin:10px 0}
+.institutional-note strong{font-size:11px;color:#264f72}
+.institutional-note p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.7;margin:6px 0 0;color:#334f6b}
+.institutional-links{display:grid;gap:10px}
+.institutional-linked,.institutional-assessment{border:1px solid #e2e9f2;border-radius:10px;padding:12px 15px;overflow-wrap:anywhere}
+.institutional-linked .outline-btn,.institutional-assessment .outline-btn{white-space:normal;height:auto;min-height:36px;margin:5px 7px 5px 0;padding:8px 12px}
+.institutional-assessment summary{cursor:pointer;font-size:12px;color:#245274;line-height:1.6}
+.institutional-assessment[open]{background:#fdfefe}
+.institutional-detail .doc-link{display:inline-flex;margin:8px 5px}
+@media(max-width:1100px){.institutional-login{max-width:255px}.institutional-user{max-width:175px}}
+@media(max-width:940px){.topbar{height:auto;min-height:70px;flex-wrap:wrap;padding:12px 20px}.topbar .refresh{margin-left:auto}.institutional-login{max-width:100%;flex:1 0 100%;justify-content:flex-start}}
+@media(max-width:630px){.institutional-login{flex-direction:column;align-items:flex-start}.institutional-user{max-width:100%}.institutional-detail{padding:16px}.institutional-detail .panel-heading{display:block}.institutional-detail .institutional-note{padding:10px}}
