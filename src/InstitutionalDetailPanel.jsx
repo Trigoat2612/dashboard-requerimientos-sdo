@@ -30,7 +30,7 @@ function Assessment({item,onNavigate}) {
   </details>;
 }
 
-export default function InstitutionalDetailPanel({token,kind,id,onNavigate,onUnauthorized}) {
+export default function InstitutionalDetailPanel({token,kind,id,onNavigate,onUnauthorized,onClose}) {
   const [state,setState]=useState({loading:true,data:null,error:''});
   useEffect(()=>{
     if(!token||!kind||!id)return;
@@ -38,14 +38,14 @@ export default function InstitutionalDetailPanel({token,kind,id,onNavigate,onUna
     setState({loading:true,data:null,error:''});
     const url='/api/institutional-data?view=detail&kind='+encodeURIComponent(kind)+'&id='+encodeURIComponent(id);
     fetch(url,{headers:{Authorization:'Bearer '+token},cache:'no-store',signal:controller.signal})
-      .then(async r=>{const body=await r.json();if(r.status===401||r.status===403){onUnauthorized?.();throw Error('La sesión no está autorizada para esta consulta');}if(!r.ok)throw Error(body.error||'No se pudo consultar el fundamento');return body;})
+      .then(async r=>{const body=await r.json();if(r.status===401||r.status===403){onUnauthorized?.('La sesión institucional expiró o perdió autorización. Identifícate nuevamente.');throw Error('La sesión no está autorizada para esta consulta');}if(!r.ok)throw Error(body.error||'No se pudo consultar el fundamento');return body;})
       .then(body=>{if(!controller.signal.aborted)setState({loading:false,data:body,error:''});})
       .catch(err=>{if(!controller.signal.aborted)setState({loading:false,data:null,error:err.message||'Error de consulta'});});
     return ()=>controller.abort();
   },[token,kind,id,onUnauthorized]);
   const d=state.data,r=d?.record;
   return <section className="panel institutional-detail" aria-live="polite">
-    <div className="panel-heading"><div><h2>Ficha institucional completa · {id}</h2><p><ShieldCheck size={14}/> Lectura autorizada · V06/V07 son propuestas, no conformidades oficiales</p></div></div>
+    <div className="panel-heading"><div><h2>Ficha institucional completa · {id}</h2><p><ShieldCheck size={14}/> Lectura autorizada · V06/V07 son propuestas, no conformidades oficiales</p></div><button className="outline-btn" onClick={onClose}>Cerrar ficha</button></div>
     {state.loading&&<p>Consultando fundamentos y trazabilidad en Neon…</p>}
     {state.error&&<p className="error-banner"><AlertCircle size={16}/>{state.error}</p>}
     {!state.loading&&!state.error&&!r&&<p>El registro no existe o no es accesible.</p>}
