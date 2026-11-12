@@ -16,11 +16,13 @@ Dashboard responsive desarrollado en Vite + React + API Serverless, base de dato
 
 ## Variables de servidor para Vercel
 - `DATABASE_URL`: cadena PostgreSQL de la **base neondb del proyecto seguimientopejenp**, no del proyecto Neon anterior.
-- `DASHBOARD_ACCESS_KEY`: secreto largo generado por el administrador. Solo en Vercel. No usar prefijo `VITE_`.
 
-Las funciones `/api/data` y `/api/update` consultan exclusivamente `ejenp_requerimientos_sdo.*`.
+La función `/api/data` permite consulta sin clave. `/api/update` responde 403 para impedir escrituras anónimas; las modificaciones institucionales se realizan por un canal autenticado. Las consultas usan exclusivamente `ejenp_requerimientos_sdo.*`.
 Vercel: Framework Vite; raíz del repositorio; compilación `npm run build`; salida `dist`.
 **Importante:** autenticar el acceso a la aplicación y restringir el despliegue para datos institucionales. El control de acceso actual es básico y no reemplaza autenticación individual con auditoría.
 
 ## Criterio de evaluación
 Una mención documental no constituye conformidad funcional. Las horas iniciales son triaje paramétrico y no equivalen a conteo contractual IFPUG aprobado. Los resultados de cumplimiento deben sustentarse en documentación, pruebas y conformidad.
+
+## Acceso sin clave compartida
+El dashboard no usa DASHBOARD_ACCESS_KEY ni muestra un inicio de sesión local. La vista puede ser pública. **No se admiten escrituras anónimas** desde la API para evitar alteraciones del análisis institucional. El equipo debe activar autenticación personal antes de permitir edición en línea.
