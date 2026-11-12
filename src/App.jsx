@@ -80,18 +80,44 @@ export default function App(){
     const timeout=setTimeout(()=>signOut('Tu sesión institucional expiró. Vuelve a identificarte para consultar los análisis.'),remaining);
     return ()=>clearTimeout(timeout);
   },[identity,institutionalToken,signOut]);
+  const [assessmentFetch,setAssessmentFetch]=useState({loading:false,loaded:0,total:0});
   useEffect(()=>{
     if(!institutionalToken||!['cobertura','auditoria'].includes(active))return;
     const controller=new AbortController();
-    fetch('/api/institutional-data?view=assessments',{
-      headers:{Authorization:'Bearer '+institutionalToken},cache:'no-store',signal:controller.signal
-    }).then(async r=>{
-      const body=await r.json();
-      if(r.status===401||r.status===403){signOut('Sesión institucional vencida o sin autorización. Inicia sesión nuevamente.');throw Error('La sesión requiere nueva autenticación');}
-      if(!r.ok||body.access!=='institutional_verified'||!Array.isArray(body.rows))throw Error(body.error||'No se pudieron consultar las evaluaciones documentales');
-      return body.rows;
-    }).then(rows=>{if(!controller.signal.aborted)setData(prev=>prev.access==='institutional_verified'?{...prev,assessments:rows}:prev);})
-      .catch(e=>{if(!controller.signal.aborted)setError(e.message||'Consulta de evaluaciones no disponible');});
+    const load=async()=>{
+      setAssessmentFetch({loading:true,loaded:0,total:0});
+      const pageFetch=async(page)=>{
+        const r=await fetch('/api/institutional-data?view=assessments&page='+page,{
+          headers:{Authorization:'Bearer '+institutionalToken},cache:'no-store',signal:controller.signal
+        });
+        const body=await r.json();
+        if(r.status===401||r.status===403){
+          signOut('Sesión institucional vencida o sin autorización. Inicia sesión nuevamente.');
+          throw Error('La sesión requiere nueva autenticación');
+        }
+        if(!r.ok||body.access!=='institutional_verified'||!Array.isArray(body.rows))throw Error(body.error||'Evaluaciones documentales no disponibles');
+        return body;
+      };
+      try {
+        const first=await pageFetch(1);
+        if(!Number.isSafeInteger(first.total)||first.total<0||first.pageSize!==200)throw Error('Metadatos de paginación inválidos');
+        const pages=Math.ceil(first.total/first.pageSize);
+        if(pages>100)throw Error('Volumen excede el límite de consulta actual');
+        const accumulated=[...first.rows];
+        setAssessmentFetch({loading:true,loaded:accumulated.length,total:first.total});
+        for(let n=2;n<=pages;n+=4){
+          const batch=await Promise.all(Array.from({length:Math.min(4,pages-n+1)},(_,i)=>pageFetch(n+i)));
+          for(const result of batch)accumulated.push(...result.rows);
+          if(controller.signal.aborted)return;
+          setAssessmentFetch({loading:true,loaded:accumulated.length,total:first.total});
+        }
+        if(controller.signal.aborted)return;
+        setData(prev=>prev.access==='institutional_verified'?{...prev,assessments:accumulated}:prev);
+      } catch(e) {
+        if(!controller.signal.aborted)setError(e.message||'Consulta de evaluaciones no disponible');
+      } finally {if(!controller.signal.aborted)setAssessmentFetch(prev=>({...prev,loading:false}));}
+    };
+    load();
     return ()=>controller.abort();
   },[active,institutionalToken,signOut]);
   const areas=useMemo(()=>[...new Set(data.requests.map(x=>x.area).filter(Boolean))].sort(),[data.requests]);
@@ -145,6 +171,7 @@ export default function App(){
       {sessionNotice&&<div className="insight" role="status"><ShieldCheck size={18}/><div><b>Sesión institucional</b><p>{sessionNotice}</p></div></div>}
       {error&&<div className="error-banner"><AlertCircle size={18}/><span>{error}. Verifica la disponibilidad de Neon y la configuración del servidor.</span><button onClick={()=>refresh(institutionalToken)}>Reintentar</button></div>}
       {data.generatedAt&&<div className="mini">Última consulta de registros: {new Date(data.generatedAt).toLocaleString('es-PE')}</div>}
+      {assessmentFetch.loading&&['cobertura','auditoria'].includes(active)&&<div className="insight" role="status"><FileText size={18}/><div><b>Cargando trazabilidad documental</b><p>{assessmentFetch.loaded} de {assessmentFetch.total||'…'} evaluaciones recuperadas en lotes autorizados.</p></div></div>}
       {publicRedacted&&active!=='resumen'&&<div className="insight"><ShieldCheck size={18}/><div><b>Consulta disponible · datos protegidos</b><p>Se muestran códigos, clasificaciones, cobertura y metadatos anonimizados de Neon. Las descripciones contractuales, los fundamentos técnicos, nombres y enlaces documentales permanecen reservados hasta verificar autorización individual. V06/V07 no equivalen a conformidades oficiales.</p></div></div>}
       <header className="page-header"><div><span className="eyebrow">CONTROL Y TRAZABILIDAD</span><h1>{tabs.find(t=>t.id===active)?.label}</h1><p>{active==='v2'?'Avance independiente de la auditoría documental, el cumplimiento SDO, las brechas, las solicitudes y la bolsa de horas.':active==='resumen'?'Corte integrado de V06, V07 y V08 basado en Neon y separado de conformidades oficiales.':active==='historico'?'Vista histórica sin estimaciones sustentadas ni detalles restringidos.':active==='sdo'?'Requisitos SDO codificados y dictámenes propuestos V06; el texto contractual original no se publica en modo anónimo.':active==='nuevos'?'Solicitudes clasificadas por V07. Las descripciones originales y condiciones individuales exigen acceso institucional.':active==='documentos'?'Inventario anonimizado por archivo; títulos y versiones están disponibles solo con acceso institucional.':active==='cobertura'?'Evaluaciones por documento y criterio SDO, diferenciando evidencia de conformidad.':active==='auditoria'?'Auditoría de inventario: vínculo documental no equivale a cumplimiento.':'Contraste de métodos para dimensionar la bolsa de horas y sus riesgos.'}</p></div><span className="live"><span className="green-dot"/> {loading?'Cargando':restricted?'Sin conexión de detalle':publicRedacted?'Datos anonimizados de Neon':'Consulta institucional autorizada'}</span></header>
       {active==='resumen'&&<V09Overview onNavigate={nav}/>}
