@@ -2,6 +2,7 @@ import React, {useEffect,useMemo,useState} from 'react';
 import AuditV2 from './AuditV2.jsx';
 import V09Overview from './V09Overview.jsx';
 import GapExplorer from './GapExplorer.jsx';
+import { toSafeCsv } from './csv-utils.js';
 import {Activity,BookOpen,ClipboardList,FileText,Layers,Calculator,Search,RefreshCw,ExternalLink,ChevronRight,CheckCircle2,AlertCircle,Menu,X,Save,Download,Database,Filter,ShieldCheck,Clock3} from 'lucide-react';
 
 const tabs=[
@@ -21,7 +22,7 @@ const compliance=['Por verificar','Cumple','Cumple parcialmente','No cumple','No
 const format=n=>new Intl.NumberFormat('es-PE',{maximumFractionDigits:0}).format(Number(n)||0);
 const trim=(v,n=210)=>String(v||'').length>n?String(v).slice(0,n)+'…':String(v||'');
 function pill(v){const val=String(v||'');if(/confirmada|no cumple|error/i.test(val))return 'pill danger';if(/cumple|validado|leído|contrastad/i.test(val))return 'pill success';if(/pendiente|por verificar|inventariado/i.test(val))return 'pill muted';return 'pill amber';}
-function csv(rows,name){const safe=x=>{const v=String(x??'');const guarded=/^[\s]*[=+@-]/.test(v)?"'"+v:v;return '"'+guarded.replaceAll('"','""')+'"';};const text=rows.map(r=>r.map(safe).join(';')).join('\r\n');const blob=new Blob(['\uFEFF'+text],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;a.click();URL.revokeObjectURL(url);}
+function csv(rows,name){const blob=new Blob([toSafeCsv(rows)],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;a.click();URL.revokeObjectURL(url);}
 function Stat({icon:Icon,label,value,desc}){return <div className="stat"><div className="stat-top"><span>{label}</span><Icon size={18}/></div><strong>{value}</strong><small>{desc}</small></div>;}
 function Field({label,children}){return <label className="field"><span>{label}</span>{children}</label>;}
 function Empty({children}){return <div className="empty"><Search size={30}/><p>{children}</p></div>;}
