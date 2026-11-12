@@ -94,33 +94,10 @@ export default async function handler(req, res) {
       sql`SELECT request_id, COUNT(*)::int AS total FROM ejenp_requerimientos_sdo.hours_estimate_proposals GROUP BY request_id`
     ]);
     res.setHeader('Cache-Control','no-store, max-age=0');
-    // El dashboard no requiere clave, por ello los informes clasificados como
-    // confidenciales se muestran únicamente como referencias de revisión.
-    const reserved = /(?:pentest|ethical.?hacking|vulnerabilit|vulnerabilidades|retest|rat[ -]+pentest)/i;
-    const publicDocuments = documents.map(d => reserved.test(d.title || '') ? {
-      ...d, title: 'Informe técnico de seguridad (acceso reservado)',
-      url: null, verification_notes: 'Existe evidencia de evaluación de seguridad. El informe detallado es confidencial y debe consultarse por canales institucionales autorizados.'
-    } : d);
-    const publicEvidence = evidence.map(e => reserved.test(e.document_title || '') ? {
-      ...e, document_title: 'Informe técnico de seguridad (acceso reservado)', document_url: null,
-      rationale: 'Referencia documental de seguridad registrada. Evidencia técnica detallada de acceso restringido.'
-    } : e);
-    const sensitive=/(?:pentest|ethical.?hacking|vulnerabilit|retest|rat[ -]+pentest|expedientes? sin (?:estado|partes)|resumenincidenciaspruebas|log de errores|listadodeexpedientes|registro_usuarios|usuarios_dia_)/i;
-    const checkedDocuments=publicDocuments.map(d=>sensitive.test(d.title||'')?{...d,url:null,verification_notes:'Documento con datos o detalles restringidos. La evaluación pública omite identificadores y contenido sensible.'}:d);
-    const checkedEvidence=publicEvidence.map(e=>sensitive.test(e.document_title||'')?{...e,document_url:null,rationale:'Referencia documental registrada. Acceso institucional restringido.'}:e);
-    const publicAssessments=assessments.map(a=>{
-      const isRestricted=sensitive.test(a.document_title||'');
-      return isRestricted?{...a,
-        document_url:null,
-        document_title:reserved.test(a.document_title||'')?'Evaluación de seguridad reservada':a.document_title,
-        finding:'Evaluación documental registrada. La información detallada requiere autorización institucional y no se divulga en el dashboard público.',
-        missing_validation:'Consultar evidencia, subsanaciones y conformidad mediante los canales institucionales autorizados.',
-        source_detail:'Metadatos de revisión (detalle reservado).'
-      }:a;
-    });
-    // Conserva exactamente el conjunto de documentos/textos ya accesibles en main.
-    // Agrega solo clasificaciones y estados propuestos de V06/V07: nunca bases,
-    // evidencia contractual íntegra ni dictámenes detallados mediante este endpoint.
+    // El inventario documental se publica íntegramente según el alcance confirmado
+    // por el responsable del proyecto. No se sustituyen títulos, enlaces ni hallazgos.
+    // No se modifica la autorización independiente de dictámenes V06/V07.
+    // Mantener la clasificación resumida V06/V07 sin convertir las propuestas en conformidades.
     const bySdo=new Map(compliance.map(c=>[c.code,c]));
     const byRequest=new Map(classification.map(c=>[String(c.request_id),c]));
     const estimateCountByRequest=new Map(estimateMethodCounts.map(c=>[String(c.request_id),Number(c.total)||0]));
@@ -139,9 +116,9 @@ export default async function handler(req, res) {
     res.setHeader('X-Content-Type-Options','nosniff');
     return res.status(200).json({
       access:'public_legacy_readonly',
-      dataScope:'Información documental pública heredada de la versión productiva, con exclusiones sensibles y dictámenes V06/V07 resumidos',
-      requests:publicRequests,sdo:publicSdo,documents:checkedDocuments,methods,
-      evidence:checkedEvidence,suggestions,assessments:publicAssessments,generatedAt:new Date().toISOString()
+      dataScope:'Inventario y análisis documentales completos; dictámenes V06/V07 resumidos y separados de conformidades oficiales',
+      requests:publicRequests,sdo:publicSdo,documents,methods,
+      evidence,suggestions,assessments,generatedAt:new Date().toISOString()
     });
   } catch (error) {
     console.error('DB read failed', error?.message);
