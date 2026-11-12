@@ -62,6 +62,7 @@ export default function V09Overview({ onNavigate }) {
           <Fact label="Brechas consolidadas verificables" value="Sin registro consolidado"/>
           <Fact label="Solicitudes clasificadas como brecha existente (V07)" value={fmt(pick(d.classification,'classification','Brecha existente'))}/>
           <p className="v2-muted">Pendiente: catálogo con identificadores estables, evidencia, responsable y estado de subsanación. Su ausencia no significa cero brechas.</p>
+          <button className="v2-refresh" onClick={() => onNavigate?.('brechas')}>Consultar registro de brechas</button>
         </Section>
         <Section icon={ClipboardList} title="3. Clasificación de solicitudes" note="V07 clasifica; la aprobación institucional es una decisión independiente.">
           <div className="v2-breakdown">{categories.map(label => <div key={label}><span>{label}</span><b>{fmt(pick(d.classification,'classification',label))}</b></div>)}</div>
