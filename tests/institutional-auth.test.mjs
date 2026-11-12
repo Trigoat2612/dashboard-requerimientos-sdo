@@ -6,6 +6,8 @@ import {
 } from '../lib/institutional-auth.js';
 import { buildInstitutionalDashboard, buildInstitutionalDetail } from '../lib/institutional-views.js';
 import { createInstitutionalHandler } from '../api/institutional-data.js';
+import authConfigHandler from '../api/auth-config.js';
+import authSessionHandler from '../api/auth-session.js';
 
 const now = Math.floor(Date.now()/1000);
 const keys = generateKeyPairSync('rsa',{modulusLength:2048});
@@ -113,4 +115,49 @@ test('autorizado obtiene análisis sin modificar fuente; POST queda prohibido',a
     const bad=res();await handler({method:'POST',headers:{authorization:'Bearer válido'}},bad);
     assert.equal(bad.statusCode,405);assert.equal(queries,9);
   } finally {if(previous===undefined)delete process.env.DATABASE_URL;else process.env.DATABASE_URL=previous;}
+});
+
+test('API de configuración no expone listas de correos ni secretos',()=>{
+  const response=res();
+  authConfigHandler({method:'GET'},response);
+  assert.equal(response.statusCode,200);
+  assert.ok(!Object.keys(response.data).includes('allowedEmails'));
+  assert.ok(!JSON.stringify(response.data).includes('DATABASE_URL'));
+  assert.ok(!JSON.stringify(response.data).includes('INSTITUTIONAL_ALLOWED_EMAILS'));
+});
+test('API de sesión rechaza credencial omitida, y nunca devuelve cadena de conexión',async()=>{
+  const response=res();
+  await authSessionHandler({method:'POST',body:{}},response);
+  assert.equal(response.statusCode,401);
+  assert.equal(response.data.code,'UNAUTHENTICATED');
+  assert.ok(!JSON.stringify(response.data).includes('GOOGLE_OIDC_CLIENT_ID'));
+});
+test('integración: JWT válido accede, JWT inválido no toca Neon',async()=>{
+  const previous=process.env.DATABASE_URL;process.env.DATABASE_URL='postgresql://test-only';
+  const client=createInstitutionalHandler({
+    authenticate:raw=>verifyInstitutionalToken(raw,{env,fetchImpl}),
+    connect:()=>async segments=>{
+      const q=segments.join(' ');
+      if(q.includes('sdo_requirements'))return [{code:'RFU-X',description:'Texto contractual',verification_status:'Oficial'}];
+      if(q.includes('sdo_compliance_proposals'))return [{code:'RFU-X',basis:'Prueba V06',proposed_evaluation:'No verificable'}];
+      if(q.includes('proposed_requirements'))return [{id:7,request_code:'REQ-7',request_text:'Requerimiento original'}];
+      if(q.includes('request_classification_proposals'))return [{request_id:7,classification:'Genuinamente nueva',basis:'Prueba V07'}];
+      return [];
+    }
+  });
+  try {
+    const good=res();await client({method:'GET',headers:{authorization:'Bearer '+jwt()},query:{view:'dashboard'}},good);
+    assert.equal(good.statusCode,200);
+    assert.equal(good.data.sdo[0].description,'Texto contractual');
+    assert.equal(good.data.requests[0].v07_basis,'Prueba V07');
+    const bad=res();await client({method:'GET',headers:{authorization:'Bearer '+jwt({email:'outsider@example.com'})},query:{view:'dashboard'}},bad);
+    assert.equal(bad.statusCode,403);
+    assert.ok(!JSON.stringify(bad.data).includes('Texto contractual'));
+  }finally{if(previous===undefined)delete process.env.DATABASE_URL;else process.env.DATABASE_URL=previous;}
+});
+test('la API no utiliza otra base ni operaciones de escritura o claves compartidas',()=>{
+  const code=String((await import('node:fs')).readFileSync(new URL('../api/institutional-data.js',import.meta.url),'utf8'));
+  assert.doesNotMatch(code,/\b(?:INSERT\s+INTO|UPDATE\s+ejenp|DELETE\s+FROM|DROP\s+TABLE)\b/i);
+  assert.doesNotMatch(code,/DASHBOARD_ACCESS_KEY/);
+  assert.match(code,/ejenp_requerimientos_sdo\.sdo_requirements/);
 });
