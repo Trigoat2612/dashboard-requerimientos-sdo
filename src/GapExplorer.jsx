@@ -24,7 +24,8 @@ export default function GapExplorer({ onOpenSdo, onOpenRequest }) {
   const [selected, setSelected] = useState(null);
 
   async function refresh() {
-    setStore(s => ({ ...s, loading: true, error: '' }));
+    setStore({ ...EMPTY, loading: true });
+    setSelected(null);
     try {
       const r = await fetch('/api/gaps', { cache: 'no-store', credentials: 'same-origin' });
       const body = await r.json();
@@ -37,7 +38,7 @@ export default function GapExplorer({ onOpenSdo, onOpenRequest }) {
       if (body.access !== 'institutional_verified') {setStore({...EMPTY,loading:false,error:'La respuesta no acreditó autorización institucional.'});return;}
       setStore({ rows: body.rows, access: body.access, loading: false, error: '' });
     } catch (error) {
-      setStore(s => ({ ...s, loading: false, error: error.message || 'Error de consulta' }));
+      setStore({ ...EMPTY, loading: false, error: error.message || 'Error de consulta' });
     }
   }
   useEffect(() => { refresh(); }, []);
