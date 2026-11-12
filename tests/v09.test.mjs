@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { filterGaps, pageGaps, gapExportRows } from '../src/gap-model.js';
+import { escapeCsvCell, toSafeCsv } from '../src/csv-utils.js';
 import dataHandler from '../api/data.js';
 import gapsHandler from '../api/gaps.js';
 import updateHandler from '../api/update.js';
@@ -70,4 +71,14 @@ test('SQL de brechas existe únicamente como DRAFT y no depende de V06 parcial',
   const source = readFileSync(new URL('../sql/v09-gap-register-DRAFT.sql', import.meta.url),'utf8');
   assert.match(source, /CREATE TABLE IF NOT EXISTS/);
   assert.doesNotMatch(source, /INSERT INTO.*sdo_compliance_proposals/i);
+});
+
+test('CSV conserva BOM y CRLF, neutraliza fórmulas y escapa comillas', () => {
+  assert.equal(escapeCsvCell('=SUM(1,2)'), '"\'=SUM(1,2)"');
+  assert.equal(escapeCsvCell('  @cmd'), '"\'  @cmd"');
+  assert.equal(escapeCsvCell('nombre "doble"'), '"nombre ""doble"""');
+  const output = toSafeCsv([['Código','Campo'],['A','+payload'],['B','texto']]);
+  assert.ok(output.startsWith('\uFEFF'));
+  assert.ok(output.includes('\r\n'));
+  assert.ok(output.includes('"\'+payload"'));
 });
