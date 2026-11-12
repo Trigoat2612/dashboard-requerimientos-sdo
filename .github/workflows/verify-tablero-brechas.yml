@@ -16,5 +16,7 @@ jobs:
           node-version: "22"
       - name: Instalar dependencias
         run: npm install --no-audit --no-fund
+      - name: Pruebas unitarias y seguridad V09
+        run: npm test
       - name: Compilar Vite
         run: npm run build
