@@ -1,28 +1,82 @@
 # Dashboard de Requerimientos SDO | EJE No Penal
 
-Dashboard responsive desarrollado en Vite + React + API Serverless, base de datos en Neon PostgreSQL.
+Aplicación existente en Vite + React, API Serverless y Neon PostgreSQL.
+**V09 evoluciona esta solución, sin reconstruirla ni modificar los registros de los agentes V00–V08.**
 
-**Destino oficial**
+## Infraestructura de referencia
+
 - GitHub: https://github.com/Trigoat2612/dashboard-requerimientos-sdo
-- Neon: proyecto `seguimientopejenp`, base PostgreSQL `neondb`, esquema `ejenp_requerimientos_sdo`.
-- Vercel: proyecto independiente para este repositorio.
+- Neon: proyecto `super-credit-91949836`, base `neondb`, esquema `ejenp_requerimientos_sdo`.
+- Vercel (producción existente): https://dashboard-requerimientos-sdo.vercel.app/
+- Rama de desarrollo: `feature/v09-dashboard-alineamiento`.
+- **Nota:** el proyecto Vercel no ha podido verificarse con los permisos del conector disponibles. La rama V09 no implica despliegue a producción.
 
-## Módulos
-1. Resumen ejecutivo de requisitos SDO, backlog y horas preliminares.
-2. Requisitos funcionales y no funcionales (475 registros de la matriz SDO).
-3. Los 68 candidatos seleccionados del backlog y la ficha de asociación con componente/SDO/brecha/observaciones/estado.
-4. Bitácora documental con procedencia, estado de análisis y vínculos originales.
-5. Evaluación comparativa de métodos de estimación y propuesta Softplan.
+## Interpretación de indicadores V09
 
-## Variables de servidor para Vercel
-- `DATABASE_URL`: cadena PostgreSQL de la **base neondb del proyecto seguimientopejenp**, no del proyecto Neon anterior.
+1. **511 requisitos SDO:** el dictamen de `sdo_compliance_proposals` es una propuesta V06, no conformidad oficial.
+2. **68 solicitudes:** la clasificación propuesta procede de `request_classification_proposals` (V07), no del estado histórico del backlog.
+3. **Bolsa de horas:** solo los registros de `hours_estimate_proposals` corresponden a métodos independientes de V08. No se suman métodos alternativos ni se infiere aprobación.
+4. **6.800 h históricas:** suma de triaje en `proposed_requirements`; no está validada como esfuerzo incremental ni horas aprobadas.
+5. **Brechas:** el diseño aditivo propuesto está en `sql/v09-gap-register-DRAFT.sql`. **No ha sido ejecutado.** No derivar automáticamente brechas de estados de cumplimiento parcial.
+6. **Auditoría documental y operativa:** se consumen los datos agregados de `audit_v2_*` y las colas sin modificar reservas.
 
-La función `/api/data` permite consulta sin clave. `/api/update` responde 403 para impedir escrituras anónimas; las modificaciones institucionales se realizan por un canal autenticado. Las consultas usan exclusivamente `ejenp_requerimientos_sdo.*`.
-Vercel: Framework Vite; raíz del repositorio; compilación `npm run build`; salida `dist`.
-**Importante:** autenticar el acceso a la aplicación y restringir el despliegue para datos institucionales. El control de acceso actual es básico y no reemplaza autenticación individual con auditoría.
+Los números se leen desde Neon y evolucionan a medida que V00–V08 registran nuevos resultados.
 
-## Criterio de evaluación
-Una mención documental no constituye conformidad funcional. Las horas iniciales son triaje paramétrico y no equivalen a conteo contractual IFPUG aprobado. Los resultados de cumplimiento deben sustentarse en documentación, pruebas y conformidad.
+## Seguridad
 
-## Acceso sin clave compartida
-El dashboard no usa DASHBOARD_ACCESS_KEY ni muestra un inicio de sesión local. La vista puede ser pública. **No se admiten escrituras anónimas** desde la API para evitar alteraciones del análisis institucional. El equipo debe activar autenticación personal antes de permitir edición en línea.
+- `/api/data` entrega **solo metadatos de lectura anonimizados**: códigos SDO, clasificaciones propuestas, referencias documentales seudonimizadas y recuentos de métodos V08. No publica textos contractuales, hallazgos, títulos originales, URLs ni horas de métodos.
+- `/api/gaps` entrega únicamente referencias preliminares V07 de solicitudes clasificadas como posible brecha, separadas explícitamente de las **0 filas consolidadas disponibles** (la tabla aún no existe). No contiene fundamentos ni evidencia privada.
+- `/api/v2-summary` publica exclusivamente indicadores agregados y datos de coordinación no nominativos. Las propuestas V06/V07 no equivalen a aprobación institucional.
+- `/api/update` responde 403 y no permite escritura anónima.
+- **No se utiliza `DASHBOARD_ACCESS_KEY`.** La consulta completa de detalles exige autenticación personal verificable y autorización institucional, todavía no implementadas. No resolver este requisito mediante simples listas de palabras prohibidas en títulos.
+- Hasta concluir las pruebas de seguridad y acceso, los cambios V09 deben permanecer en rama/PR de revisión y fuera de producción.
+
+## Validación
+
+- Construcción: `npm install --no-audit --no-fund && npm run build`.
+- GitHub Actions: workflow `Verificación del tablero de brechas` ejecutado en el PR de V09.
+- Verificar las métricas ante Neon en el mismo momento de la revisión, porque V00–V08 trabajan en paralelo.
+- No fusionar sin controles de seguridad, pruebas funcionales y regresión del despliegue.
+
+## Bloque V09-2 · pruebas y migración pendiente
+
+- `src/GapExplorer.jsx`, `src/gap-model.js`: filtros por SDO, componente, tipo, severidad, responsable y estado, paginación, exportación y relaciones documentales (solo cuando exista sesión autorizada).
+- `src/csv-utils.js`: escapado estándar y mitigación de inyección de fórmulas en CSV.
+- `npm test`: Node Test Runner, filtros, paginación, seguridad de APIs y CSV; GitHub Actions exige pruebas antes de `npm run build`.
+- `sql/v09-gap-register-DRAFT.sql` **no ejecutado**. Requiere autorización previa para la creación de objetos persistentes. Se preservan las colas de trabajo y conformidades.
+- Vercel Preview: GitHub reporta despliegues automáticos de la rama en el PR #1; el conector Vercel devuelve 403/404 para inspección y no permite las pruebas runtime E2E desde esta sesión. No confundir build/deploy Ready con validación funcional completa.
+- El acceso completo requiere SSO/OIDC y autorización institucional comprobada en servidor, todavía no configurados. No se admiten claves compartidas ni heurísticas por nombre de archivo.
+
+## Bloque V09-3 · alcance de la consulta pública
+
+- El dashboard deja de bloquear todas las matrices: se navega por los 511 códigos SDO, clasificaciones V06/V07, 68 solicitudes y sus referencias anonimizadas, inventario documental y fichas de metadatos.
+- Los fundamentos completos, textos contractuales, versiones y URLs originales de documentos, incidencias y estimaciones V08 por valor permanecen restringidos hasta habilitar autenticación individual verificable.
+- `src/App.jsx` y `src/GapExplorer.jsx` permiten búsqueda, filtros, CSV y fichas no sensibles; no generan conformidades ni modifican datos.
+- `api/v2-summary.js` omite el agregado de esfuerzo de estimaciones V08 en modo público, calcula reservas vigentes por `lease_expires_at` y mantiene triaje histórico separado.
+- La migración DDL sigue pendiente de autorización. No hay escritura ni nuevas tablas.
+- Detalle de pruebas, incidencias, conciliación y bloqueos: `docs/v09-bloque-3.md`.
+
+## V09 · Acceso institucional individual (sin contraseñas compartidas)
+
+La consulta pública **permanece anonimizada** en `/api/data`. El nuevo flujo de acceso institucional utiliza Google Identity Services y validación de ID token Google OIDC **en el servidor**, comprobando RS256, clave pública JWKS, emisor, audiencia, caducidad, correo verificado y lista nominativa de correos autorizados.
+
+**Configurar exclusivamente en Vercel Preview** del proyecto existente:
+- `GOOGLE_OIDC_CLIENT_ID`: Client ID de una aplicación web OAuth 2.0 de Google. No es un secreto; debe corresponder exactamente a la audiencia del token firmado.
+- `INSTITUTIONAL_ALLOWED_EMAILS`: correos individuales expresamente aprobados, separados por comas. **No** habilitar acceso mediante dominio completo o un comodín.
+- `DATABASE_URL`: cadena existente de lectura/conexión a Neon. Nunca transmitirla al navegador ni al repositorio.
+
+En Google Cloud Console, registrar el origen JavaScript **HTTPS** del Preview que servirá el inicio de sesión. Si se pretende habilitar más dominios, cada uno requiere la configuración de origen correspondiente y autorización. No se requiere OAuth Client Secret para la verificación de ID tokens de Google Identity Services.
+
+**Endpoints:**
+- `GET /api/auth-config`: solo `enabled` y client ID público; no devuelve allowlist.
+- `POST /api/auth-session`: valida la credencial Google y devuelve solo identidad/rol de lectura.
+- `GET /api/institutional-data?view=dashboard`: carga SDO, V06, V07, títulos/vínculos documentales, metodologías y metadatos de evaluaciones. Requiere `Authorization: Bearer <Google_ID_Token>`.
+- `GET /api/institutional-data?view=detail&kind=sdo|request|document|assessment&id=<id>`: ficha original, fundamento, condiciones de validación, enlaces y evidencias relacionadas. Requiere autenticación individual.
+- `GET /api/institutional-data?view=assessments`: obtiene hallazgos y pendientes documentales completos únicamente cuando se abre el módulo correspondiente.
+- `POST /api/update` permanece 403, y la API institucional no tiene operaciones de escritura.
+
+Los tokens solo se mantienen en la memoria React: no se almacenan en `localStorage`, cookies ni en el servidor. Al cerrar sesión se vacía inmediatamente el estado con datos institucionales.
+
+**Importante:** el código y las pruebas no habilitan por sí solos cuentas reales. Sin estas dos variables de identidad, el inicio de sesión aparece como no configurado, y la consulta original permanece reservada. Es obligatorio probar con una cuenta allowlisted y otra no autorizada en Vercel Preview antes de proponer producción. No se habilitó Neon Auth ni se crearon esquemas.
+
+**Pruebas:** `npm test` valida tokens firmados (RSA/JWKS con llave de prueba), audiencia/emisor/expiración, deny-list implícita, ausencia de sesión, rol, proyecciones institucionales y solicitud protegida con un adaptador de Neon simulado. La prueba con cuenta Google real exige la configuración antes indicada.

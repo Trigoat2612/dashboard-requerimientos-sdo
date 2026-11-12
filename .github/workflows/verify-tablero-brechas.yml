@@ -3,9 +3,10 @@ on:
   push:
     branches: [main]
   pull_request:
-    paths: ["src/**", "api/**", "package.json", "vite.config.js"]
+    paths: ["src/**", "api/**", "lib/**", "scripts/**", "tests/**", ".github/workflows/verify-tablero-brechas.yml", "package.json", "vite.config.js"]
 permissions:
   contents: read
+  statuses: read
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -16,5 +17,26 @@ jobs:
           node-version: "22"
       - name: Instalar dependencias
         run: npm install --no-audit --no-fund
+      - name: Pruebas unitarias y seguridad V09
+        run: npm test
       - name: Compilar Vite
         run: npm run build
+
+  preview-smoke:
+    name: Verificación HTTP Preview (bloqueo de producción)
+    needs: build
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feature/v09-dashboard-alineamiento'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verificar commit Vercel y endpoints HTTP reales
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          V09_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          V09_PREVIEW_URL: https://dashboard-requerimientos-sd-git-8b1718-miguel-trigosos-projects.vercel.app
+          VERCEL_PREVIEW_BYPASS_TOKEN: ${{ secrets.VERCEL_PREVIEW_BYPASS_TOKEN }}
+        run: node scripts/preview-smoke.mjs
