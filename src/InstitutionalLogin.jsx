@@ -54,6 +54,7 @@ export default function InstitutionalLogin({identity, onCredential, onLogout}) {
     return ()=>{active=false;script.removeEventListener('load',render);};
   },[config.clientId,config.enabled,identity]);
 
+  if(!config.loading&&!config.enabled&&!identity)return null;
   if(identity) return <div className="institutional-login">
     <span className="institutional-user"><ShieldCheck size={15}/> Acceso institucional: {identity.email}</span>
     <button className="outline-btn" onClick={()=>{window.google?.accounts?.id?.disableAutoSelect?.();onLogout();}}><LogOut size={15}/> Cerrar sesión</button>
