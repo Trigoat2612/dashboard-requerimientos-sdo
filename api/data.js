@@ -70,31 +70,78 @@ export function buildPublicMetadata({ requests, sdo, documents, methods, evidenc
     };
 }
 
+
+// Mantener acceso público documental ya existente en main.
+// El nuevo detalle institucional permanece en /api/institutional-data con autenticación.
 export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('Vary', 'Authorization, Cookie');
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Método no permitido' });
-  if (!process.env.DATABASE_URL) return res.status(503).json({ error: 'Conexión a Neon no configurada' });
+  if (req.method !== 'GET') return res.status(405).json({error:'Método no permitido'});
+  if (!process.env.DATABASE_URL) return res.status(503).json({error:'DATABASE_URL no está configurada'});
   try {
     const sql = neon(process.env.DATABASE_URL);
-    // Proyección positiva: nunca leer ni serializar campos confidenciales
-    // en una respuesta pública. Los joins se basan en claves y no en texto.
-    const [requests, sdo, documents, methods, evidence, assessments, compliance, classification, estimateMethodCounts] = await Promise.all([
-      sql`SELECT id, request_code, area, component, requirement_class, status AS historical_status FROM ejenp_requerimientos_sdo.proposed_requirements ORDER BY request_code`,
-      sql`SELECT code, stage, layer, component, requirement_type, cycle, progress_reported, progress_route_count FROM ejenp_requerimientos_sdo.sdo_requirements ORDER BY code`,
-      sql`SELECT id, category, mime_type, scan_status FROM ejenp_requerimientos_sdo.source_documents WHERE mime_type <> 'application/vnd.google-apps.folder' ORDER BY id`,
-      sql`SELECT name, supplier_proposed FROM ejenp_requerimientos_sdo.methodology_reviews ORDER BY name`,
-      sql`SELECT sdo_code, document_id, confidence FROM ejenp_requerimientos_sdo.requirement_evidence ORDER BY sdo_code`,
-      sql`SELECT id, document_id, sdo_code, coverage, review_level FROM ejenp_requerimientos_sdo.document_assessments ORDER BY id DESC`,
+    const [requests, sdo, documents, methods, evidence, suggestions, assessments, compliance, classification, estimateMethodCounts] = await Promise.all([
+      sql`SELECT id, source_row, request_code, area, request_text, requester, sdo_reference, gap_reference, component, requirement_class, evidence_status, compliance_status, status, comments, hours_min, hours_expected, hours_max, estimate_confidence, estimation_basis, updated_at FROM ejenp_requerimientos_sdo.proposed_requirements ORDER BY request_code`,
+      sql`SELECT code, stage, layer, component, description, requirement_type, cycle, verification_status, notes, progress_reported, progress_basis, progress_route_count FROM ejenp_requerimientos_sdo.sdo_requirements ORDER BY code`,
+      sql`SELECT id, title, url, category, mime_type, parent_id, size_bytes, modified_at, scan_status, verification_notes, checked_at FROM ejenp_requerimientos_sdo.source_documents WHERE mime_type <> 'application/vnd.google-apps.folder' ORDER BY title`,
+      sql`SELECT name, supplier_proposed, description, strengths, risks, decision, source_document_id FROM ejenp_requerimientos_sdo.methodology_reviews ORDER BY supplier_proposed DESC, name`,
+      sql`SELECT e.sdo_code,e.document_id,e.rationale,e.confidence,d.title AS document_title,d.url AS document_url FROM ejenp_requerimientos_sdo.requirement_evidence e LEFT JOIN ejenp_requerimientos_sdo.source_documents d ON d.id=e.document_id ORDER BY e.sdo_code`,
+      sql`SELECT a.proposed_requirement_id,a.sdo_code,a.similarity,a.rationale,a.review_status,s.component,s.description FROM ejenp_requerimientos_sdo.association_suggestions a JOIN ejenp_requerimientos_sdo.sdo_requirements s ON s.code=a.sdo_code ORDER BY a.proposed_requirement_id,a.similarity DESC`,
+      sql`SELECT a.id,a.document_id,a.sdo_code,a.criterion,a.coverage,a.finding,a.missing_validation,a.source_detail,a.review_level,a.reviewed_at,d.title AS document_title,d.url AS document_url FROM ejenp_requerimientos_sdo.document_assessments a JOIN ejenp_requerimientos_sdo.source_documents d ON d.id=a.document_id ORDER BY a.reviewed_at DESC,a.id DESC`,
       sql`SELECT code, proposed_evaluation, proposal_status, reviewed_at FROM ejenp_requerimientos_sdo.sdo_compliance_proposals`,
       sql`SELECT request_id, classification, proposal_status, related_sdo_codes, reviewed_at FROM ejenp_requerimientos_sdo.request_classification_proposals`,
       sql`SELECT request_id, COUNT(*)::int AS total FROM ejenp_requerimientos_sdo.hours_estimate_proposals GROUP BY request_id`
     ]);
-    return res.status(200).json(buildPublicMetadata({requests,sdo,documents,methods,evidence,assessments,compliance,classification,estimateMethodCounts}));
+    res.setHeader('Cache-Control','no-store, max-age=0');
+    // El dashboard no requiere clave, por ello los informes clasificados como
+    // confidenciales se muestran únicamente como referencias de revisión.
+    const reserved = /(?:pentest|ethical.?hacking|vulnerabilit|vulnerabilidades|retest|rat[ -]+pentest)/i;
+    const publicDocuments = documents.map(d => reserved.test(d.title || '') ? {
+      ...d, title: 'Informe técnico de seguridad (acceso reservado)',
+      url: null, verification_notes: 'Existe evidencia de evaluación de seguridad. El informe detallado es confidencial y debe consultarse por canales institucionales autorizados.'
+    } : d);
+    const publicEvidence = evidence.map(e => reserved.test(e.document_title || '') ? {
+      ...e, document_title: 'Informe técnico de seguridad (acceso reservado)', document_url: null,
+      rationale: 'Referencia documental de seguridad registrada. Evidencia técnica detallada de acceso restringido.'
+    } : e);
+    const sensitive=/(?:pentest|ethical.?hacking|vulnerabilit|retest|rat[ -]+pentest|expedientes? sin (?:estado|partes)|resumenincidenciaspruebas|log de errores|listadodeexpedientes|registro_usuarios|usuarios_dia_)/i;
+    const checkedDocuments=publicDocuments.map(d=>sensitive.test(d.title||'')?{...d,url:null,verification_notes:'Documento con datos o detalles restringidos. La evaluación pública omite identificadores y contenido sensible.'}:d);
+    const checkedEvidence=publicEvidence.map(e=>sensitive.test(e.document_title||'')?{...e,document_url:null,rationale:'Referencia documental registrada. Acceso institucional restringido.'}:e);
+    const publicAssessments=assessments.map(a=>{
+      const isRestricted=sensitive.test(a.document_title||'');
+      return isRestricted?{...a,
+        document_url:null,
+        document_title:reserved.test(a.document_title||'')?'Evaluación de seguridad reservada':a.document_title,
+        finding:'Evaluación documental registrada. La información detallada requiere autorización institucional y no se divulga en el dashboard público.',
+        missing_validation:'Consultar evidencia, subsanaciones y conformidad mediante los canales institucionales autorizados.',
+        source_detail:'Metadatos de revisión (detalle reservado).'
+      }:a;
+    });
+    // Conserva exactamente el conjunto de documentos/textos ya accesibles en main.
+    // Agrega solo clasificaciones y estados propuestos de V06/V07: nunca bases,
+    // evidencia contractual íntegra ni dictámenes detallados mediante este endpoint.
+    const bySdo=new Map(compliance.map(c=>[c.code,c]));
+    const byRequest=new Map(classification.map(c=>[String(c.request_id),c]));
+    const estimateCountByRequest=new Map(estimateMethodCounts.map(c=>[String(c.request_id),Number(c.total)||0]));
+    const publicRequests=requests.map(r=>{
+      const c=byRequest.get(String(r.id));
+      return {...r,historical_status:r.status,status:c?.classification||r.status,
+        v07_classification:c?.classification||null,v07_proposal_status:c?.proposal_status||null,
+        v07_reviewed_at:c?.reviewed_at||null,
+        v08_independent_method_count:estimateCountByRequest.get(String(r.id))||0};
+    });
+    const publicSdo=sdo.map(r=>{
+      const c=bySdo.get(r.code);
+      return {...r,v06_evaluation:c?.proposed_evaluation||null,
+        v06_proposal_status:c?.proposal_status||null,v06_reviewed_at:c?.reviewed_at||null};
+    });
+    res.setHeader('X-Content-Type-Options','nosniff');
+    return res.status(200).json({
+      access:'public_legacy_readonly',
+      dataScope:'Información documental pública heredada de la versión productiva, con exclusiones sensibles y dictámenes V06/V07 resumidos',
+      requests:publicRequests,sdo:publicSdo,documents:checkedDocuments,methods,
+      evidence:checkedEvidence,suggestions,assessments:publicAssessments,generatedAt:new Date().toISOString()
+    });
   } catch (error) {
-    console.error('V09 metadata read failed');
-    return res.status(500).json({ error: 'No se pudieron recuperar los indicadores de Neon' });
+    console.error('DB read failed', error?.message);
+    return res.status(500).json({error:'No se pudieron recuperar los datos de Neon'});
   }
 }
