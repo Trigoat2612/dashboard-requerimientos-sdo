@@ -73,7 +73,7 @@ export function createInstitutionalHandler({
           const [r,a,e]=await Promise.all([
             sql`SELECT id,title,url,category,mime_type,parent_id,size_bytes,modified_at,scan_status,verification_notes,checked_at FROM ejenp_requerimientos_sdo.source_documents WHERE id=${id}`,
             sql`SELECT id,sdo_code,criterion,coverage,finding,missing_validation,source_detail,review_level,reviewed_at FROM ejenp_requerimientos_sdo.document_assessments WHERE document_id=${id} ORDER BY reviewed_at DESC`,
-            sql`SELECT id,sdo_code,proposed_requirement_id,rationale,evidence_type,confidence FROM ejenp_requerimientos_sdo.requirement_evidence WHERE document_id=${id}`
+            sql`SELECT id,document_id,sdo_code,proposed_requirement_id,rationale,evidence_type,confidence FROM ejenp_requerimientos_sdo.requirement_evidence WHERE document_id=${id}`
           ]);
           if (!r.length) return res.status(404).json({error:'Documento no encontrado'});
           return res.status(200).json(buildInstitutionalDetail(kind,r[0],{assessments:a,evidence:e}));
