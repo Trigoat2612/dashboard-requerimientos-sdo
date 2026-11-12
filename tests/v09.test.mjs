@@ -51,7 +51,8 @@ test('proyección pública conserva las clasificaciones y elimina contenidos ins
     evidence:[{sdo_code:'RFU-01',document_id:'drive-original-secreto',confidence:'Alta',rationale:secret}],
     assessments:[{id:1,sdo_code:'RFU-01',document_id:'drive-original-secreto',coverage:'Parcial',review_level:'Análisis documental contrastado',finding:secret,source_detail:secret,missing_validation:secret}],
     compliance:[{code:'RFU-01',proposed_evaluation:'Cumplimiento parcial',proposal_status:'Propuesta'}],
-    classification:[{request_id:4,classification:'Indeterminada',related_sdo_codes:['RFU-01'],proposal_status:'Propuesta'}]
+    classification:[{request_id:4,classification:'Indeterminada',related_sdo_codes:['RFU-01'],proposal_status:'Propuesta'}],
+    estimateMethodCounts:[{request_id:4,total:2,estimate_expected:999}]
   });
   assert.equal(payload.access, 'public_metadata_only');
   assert.equal(payload.sdo[0].v06_evaluation, 'Cumplimiento parcial');
@@ -60,6 +61,8 @@ test('proyección pública conserva las clasificaciones y elimina contenidos ins
   assert.equal(payload.documents[0].title.startsWith('Documento institucional'), true);
   assert.equal(payload.evidence[0].document_id, payload.documents[0].id);
   assert.equal(payload.requests[0].hours_expected, null);
+  assert.equal(payload.requests[0].v08_independent_method_count, 2);
+  assert.equal(payload.requests[0].estimation_basis,null);
   assert.ok(!JSON.stringify(payload).includes(secret));
   assert.ok(!JSON.stringify(payload).includes('drive-original-secreto'));
   assert.ok(!JSON.stringify(payload).includes('internal.example'));
