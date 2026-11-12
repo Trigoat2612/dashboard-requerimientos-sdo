@@ -24,8 +24,8 @@ Los números se leen desde Neon y evolucionan a medida que V00–V08 registran n
 
 ## Seguridad
 
-- `/api/data` devuelve **403 sin autenticación institucional verificable**. No consulta Neon ni expone filas, documentos, códigos, enlaces, hallazgos o solicitudes.
-- `/api/gaps` devuelve **403 sin autenticación institucional verificable**. La matriz de brechas queda implementada como interfaz de solo lectura, pero sin información institucional hasta completar el control de acceso.
+- `/api/data` entrega **solo metadatos de lectura anonimizados**: códigos SDO, clasificaciones propuestas, referencias documentales seudonimizadas y recuentos de métodos V08. No publica textos contractuales, hallazgos, títulos originales, URLs ni horas de métodos.
+- `/api/gaps` entrega únicamente referencias preliminares V07 de solicitudes clasificadas como posible brecha, separadas explícitamente de las **0 filas consolidadas disponibles** (la tabla aún no existe). No contiene fundamentos ni evidencia privada.
 - `/api/v2-summary` publica exclusivamente indicadores agregados y datos de coordinación no nominativos. Las propuestas V06/V07 no equivalen a aprobación institucional.
 - `/api/update` responde 403 y no permite escritura anónima.
 - **No se utiliza `DASHBOARD_ACCESS_KEY`.** La consulta completa de detalles exige autenticación personal verificable y autorización institucional, todavía no implementadas. No resolver este requisito mediante simples listas de palabras prohibidas en títulos.
@@ -44,5 +44,14 @@ Los números se leen desde Neon y evolucionan a medida que V00–V08 registran n
 - `src/csv-utils.js`: escapado estándar y mitigación de inyección de fórmulas en CSV.
 - `npm test`: Node Test Runner, filtros, paginación, seguridad de APIs y CSV; GitHub Actions exige pruebas antes de `npm run build`.
 - `sql/v09-gap-register-DRAFT.sql` **no ejecutado**. Requiere autorización previa para la creación de objetos persistentes. Se preservan las colas de trabajo y conformidades.
-- Vercel Preview pendiente: la conexión Vercel disponible no encuentra el proyecto existente. No crear proyectos ni desplegar a producción como sustituto.
+- Vercel Preview: GitHub reporta despliegues automáticos de la rama en el PR #1; el conector Vercel devuelve 403/404 para inspección y no permite las pruebas runtime E2E desde esta sesión. No confundir build/deploy Ready con validación funcional completa.
 - El acceso completo requiere SSO/OIDC y autorización institucional comprobada en servidor, todavía no configurados. No se admiten claves compartidas ni heurísticas por nombre de archivo.
+
+## Bloque V09-3 · alcance de la consulta pública
+
+- El dashboard deja de bloquear todas las matrices: se navega por los 511 códigos SDO, clasificaciones V06/V07, 68 solicitudes y sus referencias anonimizadas, inventario documental y fichas de metadatos.
+- Los fundamentos completos, textos contractuales, versiones y URLs originales de documentos, incidencias y estimaciones V08 por valor permanecen restringidos hasta habilitar autenticación individual verificable.
+- `src/App.jsx` y `src/GapExplorer.jsx` permiten búsqueda, filtros, CSV y fichas no sensibles; no generan conformidades ni modifican datos.
+- `api/v2-summary.js` omite el agregado de esfuerzo de estimaciones V08 en modo público, calcula reservas vigentes por `lease_expires_at` y mantiene triaje histórico separado.
+- La migración DDL sigue pendiente de autorización. No hay escritura ni nuevas tablas.
+- Detalle de pruebas, incidencias, conciliación y bloqueos: `docs/v09-bloque-3.md`.
