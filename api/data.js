@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 // textos de solicitudes, conclusiones técnicas, identificadores judiciales ni hallazgos.
 // La vista institucional completa requerirá autorización verificable de servidor.
 const docKey = id => 'doc-' + createHash('sha256').update(String(id ?? '')).digest('hex').slice(0, 20);
-const restricted = 'Detalle institucional reservado; consultar mediante un canal autorizado.';
+const restricted = 'Texto original disponible mediante acceso institucional individual.';
 
 export function buildPublicMetadata({ requests, sdo, documents, methods, evidence, assessments, compliance, classification, estimateMethodCounts = [] }) {
     const bySdo = new Map(compliance.map(c => [c.code, c]));
