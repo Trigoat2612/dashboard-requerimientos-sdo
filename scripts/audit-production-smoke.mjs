@@ -25,6 +25,13 @@ async function verify(){
  assert.ok(estimates.length>0,'Estimaciones registradas visibles');
  assert.ok(rows.some(x=>x.eligibility==='EXCLUIDO'),'Exclusiones por contrato');
  assert.ok(rows.some(x=>x.eligibility==='CONDICIONAL'),'Estimaciones condicionadas');
+ const exported=await load(base+'/api/integrated-audit?view=export');
+ assert.equal(exported.status,200,'Exportación Excel debe consultar textos originales');
+ assert.equal(exported.body?.access,'read_only_audit_export');
+ assert.equal(exported.body.rows.length,318,'Exportación íntegra de 318 registros');
+ const exDetail=exported.body.rows.find(x=>x.code==='REQ00411');
+ assert.ok(exDetail?.contractual_basis_full,'Exportación incluye base contractual sin recorte');
+ assert.ok(exDetail?.estimate_justification,'Exportación incluye justificación del método WBS');
  const req=await load(base+'/api/integrated-audit?view=detail&code=REQ00411');
  assert.equal(req.status,200,'Ficha individual accesible');
  assert.equal(req.body.request.source_code,'REQ00411');
