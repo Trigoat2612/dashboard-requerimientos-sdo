@@ -31,14 +31,15 @@ function Reference({refValue,locator,claim}){
  const url=typeof refValue==='string'&&/^https:\/\//.test(refValue)?refValue:null;
  return <div className="ai-ref"><b>{url?<a href={url} target="_blank" rel="noopener noreferrer">{refValue} <ExternalLink size={12}/></a>:alt(refValue,'Referencia sin enlace')}</b>{locator&&<small>Localizador: {locator}</small>}{claim&&<p>{claim}</p>}</div>;
 }
-const initialFilters={search:'',eligibility:'',area:'',category:'',agent:'',status:'',confidence:'',batch:'',qa:'',minHours:'',maxHours:'',onlySdo:false,onlyGap:false,onlyEstimated:false,onlyExcluded:false};
+const initialFilters={search:'',decision:'',eligibility:'',area:'',category:'',agent:'',status:'',confidence:'',batch:'',qa:'',minHours:'',maxHours:'',onlySdo:false,onlyGap:false,onlyEstimated:false,onlyExcluded:false};
 function SelectField({label,value,values,onChange}){return <label>{label}<select value={value} onChange={e=>onChange(e.target.value)}><option value="">Todos</option>{values.map(v=><option key={v} value={v}>{v}</option>)}</select></label>}
 function FilterBar({rows,filters,setFilters,clear}) {
  const options=field=>[...new Set(rows.map(r=>r[field]).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'es'));
  const update=(name,val)=>setFilters(p=>({...p,[name]:val}));
  return <div className="ai-filters">
   <label className="ai-search"><Search size={17}/> <input value={filters.search} placeholder="Buscar código, texto, SDO, brecha, fundamento…" onChange={e=>update('search',e.target.value)}/></label>
-  <SelectField label="Elegibilidad V2" value={filters.eligibility} values={options('eligibility')} onChange={v=>update('eligibility',v)}/>
+  <SelectField label="Decisión técnica final V00 V9" value={filters.decision} values={options('final_decision')} onChange={v=>update('decision',v)}/>
+  <SelectField label="Elegibilidad V2 (histórica)" value={filters.eligibility} values={options('eligibility')} onChange={v=>update('eligibility',v)}/>
   <SelectField label="Área" value={filters.area} values={options('area')} onChange={v=>update('area',v)}/>
   <SelectField label="Categoría V07" value={filters.category} values={options('v07_category')} onChange={v=>update('category',v)}/>
   <SelectField label="Agente V08" value={filters.agent} values={options('v08_agent')} onChange={v=>update('agent',v)}/>
@@ -370,8 +371,8 @@ export default function IntegratedAudit({view='resumen',onNavigate=()=>{}}){
  const closeDetail=()=>{setDetail(null);const url=new URL(window.location.href);url.searchParams.delete('req');window.history.pushState({},'',url.pathname+url.search+url.hash)};
  const snap=state.snapshot,all=snap?.requests||[],filtered=useMemo(()=>filteredRequests(all,filters),[all,filters]);
  const matched=useMemo(()=>{
-   const source=view==='obligaciones318'?filtered.filter(r=>r.eligibility==='EXCLUIDO'):filtered;
-   return [...source].sort((a,b)=>{const x=orderBy==='hours'?Number(a.pert_expected||0):String(a[orderBy]||'');const y=orderBy==='hours'?Number(b.pert_expected||0):String(b[orderBy]||'');return (ascending?1:-1)*(typeof x==='number'?x-y:x.localeCompare(y,'es'))});
+   const source=view==='obligaciones318'?filtered.filter(r=>['ALCANCE_ORIGINAL_SDO','ALCANCE_ORIGINAL_BRECHA'].includes(r.final_decision)):filtered;
+   return [...source].sort((a,b)=>{const x=orderBy==='hours'?Number(a.final_pert||0):String(a[orderBy]||'');const y=orderBy==='hours'?Number(b.final_pert||0):String(b[orderBy]||'');return (ascending?1:-1)*(typeof x==='number'?x-y:x.localeCompare(y,'es'))});
  },[view,filtered,orderBy,ascending]);
  const metrics=useMemo(()=>summarize(filtered,snap?.overlaps||[]),[filtered,snap]);
  const visible=matched.slice((page-1)*pageSize,page*pageSize);
@@ -389,7 +390,7 @@ export default function IntegratedAudit({view='resumen',onNavigate=()=>{}}){
  return <div className="ai-shell">
  <div className="ai-head"><div><span className="ai-eyebrow">V09 · AUDITORÍA CONTRACTUAL Y ESTIMACIÓN INCREMENTAL</span>
  <h2>{detail?'Detalle de requerimiento':view==='resumen'?'Diagnóstico ejecutivo consolidado':view==='matriz318'?'Matriz integral de 318 solicitudes':view==='obligaciones318'?'Obligaciones contractuales de Softplan':view==='brechasLaboral'?'Brechas Laboral y trazabilidad SDO':view==='avancev08'?'Avance de estimación V08':view==='exclusionesr48'?'Exclusiones R48':view==='solapamientosv08'?'Solapamientos y componentes compartidos':'Auditoría integral'}</h2>
- <p>Fuente Neon · corte dinámico {snap?.generatedAt?new Date(snap.generatedAt).toLocaleString('es-PE'):'pendiente'} · todas las horas son técnicas, no aprobaciones contractuales</p></div>
+ <p>Neon · corte {snap?.sourceVersion||'pendiente'} · consulta {snap?.generatedAt?new Date(snap.generatedAt).toLocaleString('es-PE'):'pendiente'} · novedad técnica, no aprobación financiera</p></div>
  <button className="ai-btn secondary" disabled={state.loading} onClick={()=>refresh(true)}><RefreshCw size={16} className={state.loading?'spin':''}/> Actualizar Neon</button></div>
  {exportError&&<div className="ai-error" role="alert">Error de exportación: {exportError}</div>}
  {state.error&&<div className="ai-error"><AlertTriangle size={19}/><div>{state.error}<small>La consulta histórica de documentos sigue disponible en el dashboard original.</small></div></div>}
@@ -401,7 +402,7 @@ export default function IntegratedAudit({view='resumen',onNavigate=()=>{}}){
  <div className="ai-toolbar"><span><Filter size={14}/>{fmt(filtered.length)} de {fmt(all.length)} solicitudes {view==='brechasLaboral'?'· '+fmt(snap.gaps.length)+' registros Laboral':''}</span>
  <div><button className="ai-btn secondary" disabled={exportBusy} onClick={exportFull}><Download size={15}/> {exportBusy?"Preparando Excel…":"Excel 318 completo"}</button><button className="ai-btn primary" onClick={()=>exportAuditPptx(snap,filtered)}><BarChart3 size={15}/> PowerPoint gerencial</button></div></div>
  {view==='resumen'&&<Overview rows={filtered} snapshot={snap} m={metrics} onOpen={openDetail} onSwitch={setView}/>}
- {view==='matriz318'&&<><div className="ai-toolbar"><span>Orden de la matriz</span><div><select className="ai-order" value={orderBy} onChange={e=>setOrderBy(e.target.value)}><option value="code">Código</option><option value="area">Área</option><option value="eligibility">Elegibilidad</option><option value="v08_agent">Agente V08</option><option value="estimate_status">Estado V08</option><option value="hours">Horas PERT</option></select><button className="ai-btn secondary" onClick={()=>setAscending(p=>!p)}>{ascending?'Ascendente':'Descendente'}</button></div></div><Matrix rows={visible} onOpen={openDetail}/><Pagination page={page} setPage={setPage} total={matched.length} pageSize={pageSize}/></>}
+ {view==='matriz318'&&<><div className="ai-toolbar"><span>Orden de la matriz</span><div><select className="ai-order" value={orderBy} onChange={e=>setOrderBy(e.target.value)}><option value="code">Código</option><option value="area">Área</option><option value="eligibility">Elegibilidad</option><option value="v08_agent">Agente V08</option><option value="estimate_status">Estado V08</option><option value="hours">PERT final admitido</option><option value="final_decision">Decisión técnica V00 V9</option></select><button className="ai-btn secondary" onClick={()=>setAscending(p=>!p)}>{ascending?'Ascendente':'Descendente'}</button></div></div><Matrix rows={visible} onOpen={openDetail}/><Pagination page={page} setPage={setPage} total={matched.length} pageSize={pageSize}/></>}
  {view==='obligaciones318'&&<Obligations rows={filtered} sdoCatalog={snap.sdo||[]} onOpen={openDetail} onSdo={code=>onNavigate('sdo',code,{kind:'sdo',id:code})}/>}
  {view==='brechasLaboral'&&<GapTable gaps={snap.gaps||[]} rows={all} onOpen={openDetail} onSdo={code=>onNavigate('sdo',code,{kind:'sdo',id:code})}/>}
  {view==='avancev08'&&<AgentProgress snap={snap} rows={all} onOpen={openDetail}/>}
