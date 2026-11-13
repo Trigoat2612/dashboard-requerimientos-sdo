@@ -5,7 +5,43 @@ Dashboard Vite + React, funciones serverless y Neon PostgreSQL, en el repositori
 
 **Producción:** https://dashboard-requerimientos-sdo.vercel.app/  
 **Neon:** `super-credit-91949836` / `neondb` / `ejenp_requerimientos_sdo`.  
-**Fuente:** datos históricos y propuestas de V00–V08, consultados dinámicamente sin modificar conformidades oficiales.
+**Fuente vigente de novedad técnica:** cierre V00 V9, con detalle histórico V07/V08 y fuentes de cuatro esquemas Neon, de solo lectura.
+
+## Corte ejecutivo vigente: V00 V9 (13/11/2026)
+
+El dashboard consulta en cada carga `ejenp_estimacion_v08.v00_final_novedad_318_v9`,
+concilia 318 códigos únicos con `v00_novedad_gerencial_v9` y muestra **solo las funcionalidades genuinamente nuevas del EJE** como horas incrementales.
+
+**Último corte comprobado:** `V00-20261113-NOVEDAD-TECNICA-V9`.
+De 318 solicitudes, 6 están acreditadas como `NUEVO_EJE`, con
+**2.490,833 horas-persona PERT** y 44 actividades WBS admitidas.
+Las 312 restantes no integran el total de nuevos desarrollos. El histórico V07/V08 sigue accesible como antecedente, **pero no se agrega automáticamente** a la bolsa.
+
+La solución incluye siete secciones integrales: resumen gerencial, matriz 318, obligaciones originales Softplan,
+331 brechas Laboral, seguimiento V08, exclusiones R48 y 49 relaciones de solapamiento.
+**R48 está registrado** en `v00_r48_final_scope_v4` y
+`v00_r48_resolutions_v5`. El antiguo diagnóstico de falta de R48 corresponde a una versión anterior del tablero.
+
+Un cambio directo a SIJ, REMAJU, SERNOT u otro satélite no se estima como desarrollo EJE. Una reformulación para intervenir exclusivamente EJE debe analizarse como nuevo alcance y contrastarse con SDO y brechas.
+
+Los indicadores ejecutivos son técnicos: **no constituyen aprobación de contrato ni de pago**.
+Las pestañas y API anteriores se conservan.
+
+**Rutas de consulta:**
+- `GET /api/integrated-audit?view=snapshot`: 318 solicitudes, dictamen técnico V00 V9, resumen gerencial, brechas Laboral, R48 y solapamientos
+- `GET /api/integrated-audit?view=detail&code=REQ00157`: ficha original y WBS admitida del nuevo EJE
+- `GET /api/integrated-audit?view=detail&code=REQ00613`: ejemplo de cambio externo, con 0 horas EJE y estimación histórica no imputada
+- `GET /api/integrated-audit?view=export`: 318 fundamentos íntegros para Excel
+
+Se generan **XLSX de 56 columnas** y **PPTX gerencial de 12 diapositivas** desde el navegador.
+La presentación tiene diseño institucional editable, pero requiere la plantilla oficial cuando esté disponible.
+
+El flujo `scripts/audit-production-smoke.mjs` verifica por HTTP la URL de producción,
+el cierre V00 V9, la conciliación de horas, la WBS admitida y las exclusiones externas.
+La versión productiva se despliega desde `main` y conserva las verificaciones `npm test` / `npm run build`.
+
+Para el reporte de implementación, consultar
+[`docs/v09-cierre-v00-v9.md`](docs/v09-cierre-v00-v9.md).
 
 ## Consulta documental íntegra
 
