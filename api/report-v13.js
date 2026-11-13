@@ -4,14 +4,34 @@ const INCREMENTAL='INCREMENTAL_EVALUACION_USUARIO';
 const n=x=>Number(x??0);
 const delta=(a,b)=>Math.abs(n(a)-n(b));
 const send=(res,status,obj)=>res.status(status).json(obj);
+// Una categoría sin solicitudes puede omitirse en el GROUP BY de la vista.
+// Mostrarla como 0 no altera registros ni inventa decisiones individuales.
+const institutionalCategories=[
+ ['INCREMENTAL_EVALUACION_USUARIO','Nuevas funcionalidades incrementales sujetas a evaluación del usuario final'],
+ ['ALCANCE_SDO','Funcionalidades comprendidas en SDO'],
+ ['ALCANCE_BRECHA','Funcionalidades comprendidas en brechas'],
+ ['DUPLICADO','Solicitudes duplicadas'],
+ ['EXTERNO_O_REFORMULACION','Solicitudes sobre sistemas externos o sujetas a reformulación'],
+ ['CONFIGURACIONES_Y_AJUSTES','Configuraciones y ajustes']
+];
+export function completeCategories(categories=[]){
+ const known=new Map(categories.map(c=>[c.categoria_resumen_v13,c]));
+ if(known.size!==categories.length)throw Error('Categorías duplicadas en la vista institucional');
+ if(categories.some(c=>!institutionalCategories.some(([id])=>id===c.categoria_resumen_v13)))
+  throw Error('Nueva categoría institucional no reconocida');
+ return institutionalCategories.map(([id,visible])=>known.get(id)||{
+  categoria_resumen_v13:id,categoria_visible_v13:visible,
+  solicitudes:0,con_estimacion_wbs:0,horas_incrementales_propuestas:'0.000'
+ });
+}
 
 export function reconcileV13({manager,categories,rows,phases,byCode}){
  if(!manager)throw Error('Falta el indicador gerencial');
  const counts=new Map();
  for(const row of rows)counts.set(row.categoria_resumen_v13,(counts.get(row.categoria_resumen_v13)||0)+1);
  if(rows.length!==n(manager.total_solicitudes)||new Set(rows.map(r=>r.code)).size!==n(manager.codigos_unicos))throw Error('318 códigos no conciliados');
- if(categories.length!==6||categories.reduce((s,c)=>s+n(c.solicitudes),0)!==rows.length)throw Error('Seis categorías no conciliadas');
- for(const c of categories)if(counts.get(c.categoria_resumen_v13)!==n(c.solicitudes))throw Error('Clasificación discrepante: '+c.categoria_resumen_v13);
+ if(categories.length!==6||categories.reduce((s,c)=>s+n(c.solicitudes),0)!==rows.length)throw Error('Las categorías institucionales no concilian');
+ for(const c of categories)if((counts.get(c.categoria_resumen_v13)||0)!==n(c.solicitudes))throw Error('Clasificación discrepante: '+c.categoria_resumen_v13);
  const get=code=>n(categories.find(c=>c.categoria_resumen_v13===code)?.solicitudes);
  if(get(INCREMENTAL)!==n(manager.incrementales_evaluacion_usuario)||get('ALCANCE_SDO')!==n(manager.sdo)
   ||get('ALCANCE_BRECHA')!==n(manager.brechas)||get('DUPLICADO')!==n(manager.duplicados)
@@ -19,7 +39,7 @@ export function reconcileV13({manager,categories,rows,phases,byCode}){
   ||get('CONFIGURACIONES_Y_AJUSTES')!==n(manager.configuraciones_y_ajustes))throw Error('Resumen incompatible con las seis categorías');
  const externals=rows.filter(r=>r.categoria_resumen_v13==='EXTERNO_O_REFORMULACION');
  if(externals.filter(x=>/Cambio directo en sistema externo/i.test(x.subcategoria_funcional_v13||'')).length!==n(manager.modificacion_sistema_externo)
- ||externals.filter(x=>/Reformular como funcionalidad EJE/i.test(x.subcategoria_funcional_v13||'')).length!==n(manager.reformular_para_eje))throw Error('52 / 34 casos externos no concilian');
+ ||externals.filter(x=>/Reformular como funcionalidad EJE/i.test(x.subcategoria_funcional_v13||'')).length!==n(manager.reformular_para_eje))throw Error('Las subcategorías de sistemas externos no concilian');
  const proposals=rows.filter(x=>x.categoria_resumen_v13===INCREMENTAL);
  const pert=proposals.reduce((v,x)=>v+n(x.horas_pert_incrementales_propuestas),0);
  if(proposals.length!==n(manager.incrementales_evaluacion_usuario)||delta(pert,manager.horas_pert_incrementales)>.015)throw Error('122 propuestas o PERT inconciliables');
@@ -31,7 +51,7 @@ export function reconcileV13({manager,categories,rows,phases,byCode}){
 }
 
 export async function loadSnapshot(sql){
- const [managers,categories,rows,phases,byCode,sdo,gaps,methods]=await Promise.all([
+ const [managers,rawCategories,rows,phases,byCode,sdo,gaps]=await Promise.all([
   sql`SELECT * FROM ejenp_estimacion_v08.v00_informe_gerencial_v13`,
   sql`SELECT * FROM ejenp_estimacion_v08.v00_informe_categorias_v13`,
   sql`SELECT request_id,code,descripcion,especialidad,lote,hoja_fuente,fila_fuente,
@@ -45,10 +65,13 @@ export async function loadSnapshot(sql){
   sql`SELECT fase,COUNT(*)::integer actividades,ROUND(SUM(horas_pert),3) horas FROM ejenp_estimacion_v08.v00_informe_wbs_122_v13 GROUP BY fase ORDER BY horas DESC`,
   sql`SELECT codigo,COUNT(*)::integer actividades,ROUND(SUM(horas_pert),3) horas_pert FROM ejenp_estimacion_v08.v00_informe_wbs_122_v13 GROUP BY codigo ORDER BY codigo`,
   sql`SELECT code,description,verification_status,source_document_id FROM ejenp_requerimientos_sdo.sdo_requirements ORDER BY code`,
-  sql`SELECT id,source_gap_code AS gap_code,source_sdo_code AS sdo_code,source_request_code AS request_code,source_description AS description,source_final_status,source_sheet,source_row FROM ejenp_v14_brechas.items ORDER BY id`,
-  sql`SELECT name,supplier_proposed,description,strengths,risks,decision,source_document_id FROM ejenp_requerimientos_sdo.methodology_reviews ORDER BY supplier_proposed DESC,name`
+  sql`SELECT id,source_gap_code AS gap_code,source_sdo_code AS sdo_code,source_request_code AS request_code,source_description AS description,source_final_status,source_sheet,source_row FROM ejenp_v14_brechas.items ORDER BY id`
  ]);
- const manager=managers[0];
+ const manager=managers[0],categories=completeCategories(rawCategories);
+ // Las fuentes de métodos son auxiliares. Su permiso no puede bloquear el informe V13.
+ const methods=await sql`SELECT name,supplier_proposed,description,strengths,risks,decision,source_document_id
+   FROM ejenp_requerimientos_sdo.methodology_reviews ORDER BY supplier_proposed DESC,name`
+   .catch(()=>[]);
  const reconciliation=reconcileV13({manager,categories,rows,phases,byCode});
  return {access:'public_readonly_report',source:'Neon · informe técnico consolidado',
   generatedAt:new Date().toISOString(),manager,categories,rows,phases,byCode,sdo,gaps,methods,reconciliation};
@@ -99,7 +122,7 @@ export async function loadExport(sql){
   ||wbs.length!==635||new Set(wbs.map(x=>x.codigo)).size!==proposals.length
   ||delta(wbs.reduce((a,x)=>a+n(x.horas_pert),0),manager?.horas_pert_incrementales)>.015)
   throw Error('Exportación incompatible con vistas del informe');
- return {rows,wbs,categories,manager};
+ return {rows,wbs,categories:completeCategories(categories),manager};
 }
 export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store, max-age=0');
