@@ -274,7 +274,7 @@ function RequestDetail({code,onClose,onSdo}){
    .then(data=>{if(!stopped)setState({loading:false,data,error:''})}).catch(e=>{if(!stopped)setState({loading:false,data:null,error:e.message})});
   return()=>{stopped=true};
  },[code]);
- const d=state.data, v2=d?.v2?.at(-1),u=d?.units?.find(u=>u.estimate_id)||d?.units?.[0], sdo=d?.sdoLinks||[],gaps=d?.gapLinks||[],wbs=d?.wbs||[];
+ const d=state.data, final=d?.finalDecision, v2=d?.v2?.at(-1),u=d?.units?.find(u=>u.estimate_id)||d?.units?.[0], sdo=d?.sdoLinks||[],gaps=d?.gapLinks||[],wbs=d?.wbs||[];
  const totals=names=>wbs.length?wbs.reduce((s,w)=>s+Number(w[names]||0),0):null;
  return <div className="ai-flow">
  <div className="ai-detailhead"><button className="ai-btn secondary" onClick={onClose}><ChevronLeft size={16}/> Volver</button><h2>{code} · Ficha completa de auditoría</h2><span>URL directa · solo lectura</span></div>
@@ -283,6 +283,19 @@ function RequestDetail({code,onClose,onSdo}){
  {d&&<>
  <Block title="A. Solicitud original" subtitle="Procedencia íntegra del registro 318"><p className="ai-prose">{d.request.request_text}</p>
  <div className="ai-facts"><span>Área: <b>{d.request.area}</b></span><span>Lote: <b>{d.request.batch_code}</b></span><span>Origen: <b>{d.request.source_sheet}, fila {d.request.source_row}</b></span><span>Fecha: <b>{alt(d.request.created_at)}</b></span></div>
+ </Block>
+ <Block title="Dictamen técnico definitivo V00 V9" subtitle="Resultado de novedad técnica: prevalece para contabilizar horas sobre clasificaciones V07/V2 y WBS preliminares">
+ <div className="ai-mini-metrics">
+ <Metric label="Clasificación final" value={labels[final?.decision_tecnica_final]||final?.decision_tecnica_final}/>
+ <Metric label="PERT incremental EJE" value={fmtHours(final?.horas_pert_admitidas)} flag={final?.es_novedad_acreditada?'primary':''}/>
+ <Metric label="PERT histórico excluido" value={fmtHours(final?.horas_no_incluidas)} />
+ <Metric label="Versión del cierre" value={final?.version_cierre_tecnico||'Sin corte'} />
+ </div>
+ <p><b>Fundamento final:</b> {alt(final?.fundamento_tecnico_final)}</p>
+ <p><b>Sistema y responsable:</b> {alt(final?.responsable_contractual_funcional)}</p>
+ {final?.decision_tecnica_final==='CAMBIO_EXTERNO'&&<div className="ai-callout"><AlertTriangle size={17}/><span>La solicitud modifica directamente un sistema externo. No corresponde contabilizar sus WBS históricas en el desarrollo EJE. Para intervenir EJE debe reformularse la funcionalidad y contrastarse nuevamente con SDO/brechas.</span></div>}
+ {final?.decision_tecnica_final==='NOVEDAD_NO_ACREDITADA'&&<div className="ai-callout">La novedad técnica no se acreditó con la evidencia disponible. Su WBS histórica, si existe, queda excluida del total final.</div>}
+ <p><b>Fuentes del dictamen:</b> {alt(final?.fuentes_tecnicas_finales)}</p>
  </Block>
  <Block title="B. Análisis funcional V07" subtitle="La solicitud no implica por sí sola desarrollo facturable">
  {(d.assessments||[]).map(a=><details key={a.id} open={a.id===d.assessments.at(-1)?.id}><summary>Revisión {a.revision_no} · {a.category} · {a.author_agent}</summary>
@@ -295,14 +308,27 @@ function RequestDetail({code,onClose,onSdo}){
  {(gaps||[]).map((g,i)=><div className="ai-ref" key={i}><strong>Brecha #{g.gap_item_id} · {g.source_gap_code||'Sin código'}</strong><p>{g.source_description}</p><small>{g.basis}</small></div>)}
  <p><b>Sustento de exclusión:</b> {alt(v2?.exclusions,u?.exclusions_snapshot)}</p>
  </Block>
- <Block title="D. Método de estimación" subtitle="WBS + estimación de tres puntos + PERT + juicio experto; contrastes funcionales solo cuando estén medidos">
- {u?.estimate_id?<><p><b>Metodología:</b> {u.methodology}</p><p><b>Justificación experta:</b> {u.expert_justification}</p><p><b>Confianza:</b> {u.estimate_confidence}</p><p><b>Alcance:</b> {u.scope_basis}</p><p><b>Exclusiones:</b> {u.exclusions_basis}</p><p><b>Estado contractual:</b> {u.contractual_status} (sin aprobación automática)</p></>:<div className="ai-callout">Sin estimación WBS persistida. {v2?.decision||'Revisión pendiente'}.</div>}
- {(d.methods||[]).map(m=><p key={m.id}><b>{m.method}:</b> {m.size_units} {m.unit_name} · {m.measurement_boundary}; contraste, no suma adicional de horas</p>)}
+ <Block title="D. Método técnico y estado del cierre" subtitle="Juicio experto WBS / 3 puntos / PERT solo para trabajo nuevo EJE acreditado">
+ {final?.es_novedad_acreditada?<><p><b>Método final:</b> {alt(final?.metodo_cierre)}</p>
+   <p><b>Justificación técnica:</b> {alt(u?.expert_justification,final?.fundamento_tecnico_final)}</p>
+   <p><b>Delta incremental:</b> {alt(final?.ampliacion_funcional_analizada)}</p>
+   <p><b>Fuente:</b> {alt(final?.fuentes_tecnicas_finales)}</p>
+   <p><b>Escenario esperado:</b> PERT = (O + 4 × M + P) / 6 por actividad; suma de actividades WBS admitidas por V00.</p>
+   <p><b>Nota:</b> Estimación técnica de novedad EJE; no es una decisión de pago ni aprobación contractual.</p>
+ </>:<div className="ai-callout"><AlertTriangle size={17}/><span><b>No aplica carga a bolsa de nuevas funcionalidades.</b> Dictamen: {alt(final?.decision_tecnica_final)}. Las antiguas estimaciones WBS, si existen, se preservan solo como antecedente histórico; su esfuerzo admitido es 0 h.</span></div>}
+ {(d.methods||[]).map(m=><p key={m.id}><b>{m.method}:</b> {m.size_units} {m.unit_name} · {m.measurement_boundary}; contraste histórico, nunca suma adicional automática</p>)}
  </Block>
- <Block title="E. Horas por actividad WBS" subtitle="O ≤ M ≤ P. PERT calculado desde cada actividad; no se suma con métodos IFPUG/COSMIC/SNAP.">
+ <Block title="E. Horas por actividad WBS" subtitle="Solo actividades que V00 V9 reconoce como funcionalidad nueva. PERT = (O + 4 × M + P) / 6. No sumar métodos auxiliares.">
  {wbs.length?<><div className="ai-mini-metrics">{[['O','o'],['Más probable','m'],['PERT','pert'],['P','p']].map(([k,key])=><Metric key={key} label={k} value={fmtHours(totals(key))}/>)}</div>
  <Tabular headers={['Código','Fase','Actividad / descripción','Por qué es incremental','O','M','PERT','P','Componente']}>
- {wbs.map(w=><tr key={w.id}><td>{w.activity_code}</td><td>{w.phase}</td><td className="ai-long">{w.description}<small>{w.notes}</small></td><td className="ai-long">{w.incremental_basis}</td><td className="ai-num">{fmt2(w.o)}</td><td className="ai-num">{fmt2(w.m)}</td><td className="ai-num">{fmt2(w.pert)}</td><td className="ai-num">{fmt2(w.p)}</td><td>{w.effort_scope}{w.component_key&&<small>{w.component_key}</small>}</td></tr>)}</Tabular></>:<Empty>No corresponde sumar horas sin WBS aprobada para registro técnico.</Empty>}
+ {wbs.map(w=><tr key={w.id}><td>{w.activity_code}</td><td>{w.phase}</td><td className="ai-long">{w.description}<small>{w.notes}</small></td><td className="ai-long">{w.incremental_basis}</td><td className="ai-num">{fmt2(w.o)}</td><td className="ai-num">{fmt2(w.m)}</td><td className="ai-num">{fmt2(w.pert)}</td><td className="ai-num">{fmt2(w.p)}</td><td>{w.effort_scope}{w.component_key&&<small>{w.component_key}</small>}</td></tr>)}</Tabular></>:<Empty>El cierre técnico no reconoce actividades incrementales WBS para este requerimiento. El esfuerzo admitido es 0 h.</Empty>}
+ {d.historicalWbs?.length>0&&<details className="ai-history"><summary>Ver {d.historicalWbs.length} actividades WBS históricas de V08 (no necesariamente admitidas)</summary>
+  <p>La WBS histórica conserva trazabilidad, pero el único esfuerzo nuevo reconocido es el indicado por el dictamen V00 V9.</p>
+  <Tabular headers={['Actividad histórica','Justificación anterior','PERT preliminar','Estado final']}>
+  {d.historicalWbs.map(w=><tr key={w.id}><td>{w.activity_code} · {w.description}</td><td>{w.incremental_basis}</td>
+    <td className="ai-num">{fmtHours(w.pert)}</td><td>{final?.es_novedad_acreditada?'Contrastar con WBS admitida':'No incluir en nueva funcionalidad EJE'}</td></tr>)}
+  </Tabular>
+ </details>}
  </Block>
  <Block title="F. Riesgos, hipótesis, dependencias y contingencias" subtitle="Incertidumbre incluida en P no puede contabilizarse otra vez como contingencia">
  {(u?.conditional_assumptions||[]).length>0&&<div className="ai-callout"><b>Estimación condicionada</b><pre>{JSON.stringify(u.conditional_assumptions,null,2)}</pre></div>}
@@ -318,12 +344,15 @@ function RequestDetail({code,onClose,onSdo}){
  {!(d.documents||[]).length&&!(u?.technical_sources||[]).length&&!(v2?.document_references||[]).length&&<p>Sin documento trazable registrado.</p>}
  </Block>
  <Block title="H. Historia de revisiones, QA y decisiones" subtitle="No se borran dictámenes anteriores al aplicar la revisión V2">
+ <p><b>Cierre V00 V9:</b> {alt(final?.version_cierre_tecnico)} · {alt(final?.decision_tecnica_final)} · {alt(final?.fundamento_tecnico_final)}</p>
+ {(d.r48Scope||[]).map(x=><p key={'r48scope'+x.id}><b>R48 V4 · {x.final_decision}</b> · {x.decided_at}<small>{x.contractual_rationale}</small></p>)}
+ {(d.r48Resolutions||[]).map(x=><p key={'r48resolution'+x.id}><b>R48 V5 · {x.decision}</b> · {x.decided_at}<small>{x.basis}</small></p>)}
  {(d.qa||[]).map(q=><p key={q.id}><b>QA V07 · {q.result}</b> · {q.reviewer} · {q.created_at}<small>{q.reason}</small></p>)}
  {(d.v2||[]).map(v=><p key={v.id}><b>V2 rev. {v.review_version} · {v.decision}</b> · {v.reviewed_by} · {v.reviewed_at}<small>{v.quality_reason}</small></p>)}
  {(d.peerReviews||[]).map(p=><p key={p.id}><b>Revisión secundaria · {p.result}</b> · {p.reviewer_agent} · {p.created_at}<small>{p.basis}</small></p>)}
  {(d.qualityChecks||[]).map(q=><p key={q.id}><b>QA V08 · {q.outcome}</b> · {q.reviewer} · {q.created_at}<small>{q.basis}</small></p>)}
  {(d.events||[]).slice(-15).map(ev=><p key={ev.id}><b>V08 · {ev.action}</b> · {ev.actor} · {ev.created_at}</p>)}
- <p><b>R48:</b> No consta resolución individual registrada en la fuente R48 a la fecha de consulta.</p>
+ <p><b>R48:</b> {d.r48Scope?.length||d.r48Resolutions?.length?'Se muestran las revisiones anteriores que existen en Neon.':'No existe dictamen R48 específico para este código.'}</p>
  </Block>
  </>}
  </div>;
