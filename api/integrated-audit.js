@@ -15,28 +15,28 @@ export async function loadAuditSnapshot(sql) {
       SELECT r.id, r.source_code AS code, r.batch_code AS batch, r.source_sheet,
         r.source_row, r.area, r.request_text AS description, r.created_at AS source_date,
         a.id AS assessment_id, a.revision_no AS v07_revision, a.author_agent AS v07_agent,
-        a.category AS v07_category, a.contractual_basis, a.technical_basis,
-        a.base_functionality, a.sdo_obligation, a.contractual_gap,
-        a.additional_capacity, a.genuine_delta, a.estimation_exclusions,
+        a.category AS v07_category, LEFT(a.contractual_basis,450) AS contractual_basis,
+        LEFT(a.technical_basis,500) AS technical_basis, LEFT(a.genuine_delta,350) AS genuine_delta,
+        LEFT(a.estimation_exclusions,350) AS estimation_exclusions,
         a.confidence AS v07_confidence, a.created_at AS v07_date,
-        q.result AS qa_v07, q.reason AS qa_v07_reason, q.created_at AS qa_v07_date,
-        e.eligibility, e.category AS eligibility_category, e.technical_reason AS exclusion_reason,
+        q.result AS qa_v07, LEFT(q.reason,350) AS qa_v07_reason, q.created_at AS qa_v07_date,
+        e.eligibility, e.category AS eligibility_category, LEFT(e.technical_reason,400) AS exclusion_reason,
         v.id AS v2_id, v.review_version, v.decision AS v2_decision, v.effort_mode,
-        v.sdo_equivalence, v.original_covered_scope, v.additional_behavior,
-        v.incremental_delta, v.sdo_baseline, v.gap_baseline,
-        v.exclusions AS v2_exclusions, v.pending_conditions, v.quality_reason,
+        LEFT(v.sdo_equivalence,600) AS sdo_equivalence, LEFT(v.original_covered_scope,350) AS original_covered_scope,
+        LEFT(v.additional_behavior,350) AS additional_behavior, LEFT(v.incremental_delta,350) AS incremental_delta,
+        LEFT(v.pending_conditions,350) AS pending_conditions,
         v.duplicate_master_request_id, v.source_category, v.reviewed_at AS v2_date,
         u.id AS unit_id, u.assigned_agent AS v08_agent, u.workstream,
-        u.status AS estimate_status, u.block_reason, u.updated_at AS estimate_updated,
+        u.status AS estimate_status, LEFT(u.block_reason,300) AS block_reason, u.updated_at AS estimate_updated,
         s.estimate_id, s.confidence AS estimate_confidence, s.contractual_status,
         s.wbs_count, s.optimistic, s.most_likely, s.pert_expected, s.pessimistic,
         s.contingency_separate, s.qa_outcome, s.accepted_technical_pert, s.extreme_hours,
-        x.technical_reason AS exclusion_zero_reason, x.incremental_hours AS exclusion_zero_hours,
-        COALESCE((SELECT jsonb_agg(jsonb_build_object('code',l.sdo_code,'relation',l.relation,'basis',l.contractual_basis))
+        LEFT(x.technical_reason,400) AS exclusion_zero_reason, x.incremental_hours AS exclusion_zero_hours,
+        COALESCE((SELECT jsonb_agg(jsonb_build_object('code',l.sdo_code,'relation',l.relation))
            FROM ejenp_auditoria_318.sdo_links l WHERE l.request_id=r.id),'[]'::jsonb) AS sdo_links,
-        COALESCE((SELECT jsonb_agg(jsonb_build_object('id',l.gap_item_id,'relation',l.relation,'basis',l.basis))
+        COALESCE((SELECT jsonb_agg(jsonb_build_object('id',l.gap_item_id,'relation',l.relation))
            FROM ejenp_auditoria_318.gap_links l WHERE l.request_id=r.id),'[]'::jsonb) AS gap_links,
-        COALESCE((SELECT jsonb_agg(jsonb_build_object('request_id',l.related_request_id,'relation',l.relation_type,'basis',l.basis))
+        COALESCE((SELECT jsonb_agg(jsonb_build_object('request_id',l.related_request_id,'relation',l.relation_type))
            FROM ejenp_auditoria_318.request_relations l WHERE l.request_id=r.id),'[]'::jsonb) AS relations
       FROM ejenp_auditoria_318.requests r
       LEFT JOIN LATERAL (SELECT * FROM ejenp_auditoria_318.technical_assessments a
