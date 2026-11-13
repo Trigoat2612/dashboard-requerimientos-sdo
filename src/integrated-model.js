@@ -60,6 +60,10 @@ export function exportColumns(r) {
  isEstimated(r)?r.pert_expected:r.eligibility==='EXCLUIDO'?0:'',isEstimated(r)?r.pessimistic:r.eligibility==='EXCLUIDO'?0:'',
  isEstimated(r)?r.contingency_separate:r.eligibility==='EXCLUIDO'?0:'',
  r.contractual_status||'',r.qa_outcome||'Pendiente',r.pending_conditions,r.sdo_equivalence,
- r.duplicate_master_request_id||'',r.source_date||'',r.v2_date||''];
+ r.duplicate_master_request_id||'',r.source_date||'',r.v2_date||'',
+ r.contractual_basis_full||r.contractual_basis||'',r.technical_basis_full||r.technical_basis||'',
+ r.sdo_baseline_full||'',r.gap_baseline_full||'',r.equivalence_full||r.sdo_equivalence||'',
+ r.v2_quality_reason||'',r.exclusions_full||'',r.estimate_justification||'',
+ JSON.stringify(r.document_references||[]),JSON.stringify(r.estimate_sources||[])];
 }
-export const exportHeaders=['Código','Solicitud íntegra','Lote','Área','Agente V07','Categoría V07','QA V07','Elegibilidad V2','Dictamen V2','SDO vinculados','Brechas vinculadas','Cobertura original','Comportamiento adicional','Delta incremental','Fundamento técnico','Exclusión','Estado V08','Agente V08','Confianza','Optimista h','Más probable h','PERT h','Pesimista h','Contingencia h','Estado contractual','QA técnico','Condiciones pendientes','Equivalencia funcional','Duplicado principal','Fecha fuente','Fecha revisión V2'];
+export const exportHeaders=['Código','Solicitud íntegra','Lote','Área','Agente V07','Categoría V07','QA V07','Elegibilidad V2','Dictamen V2','SDO vinculados','Brechas vinculadas','Cobertura original','Comportamiento adicional','Delta incremental','Fundamento técnico','Exclusión','Estado V08','Agente V08','Confianza','Optimista h','Más probable h','PERT h','Pesimista h','Contingencia h','Estado contractual','QA técnico','Condiciones pendientes','Equivalencia funcional','Duplicado principal','Fecha fuente','Fecha revisión V2','Base contractual íntegra','Fundamento V07 íntegro','Línea base SDO íntegra','Línea base de brechas','Equivalencia V2 íntegra','Fundamento de revisión V2','Exclusiones íntegras','Justificación experta WBS','Referencias V2','Fuentes estimación V08'];
