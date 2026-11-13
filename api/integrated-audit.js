@@ -120,6 +120,27 @@ export async function loadRequestDetail(sql, code) {
     wbs,risks,assumptions,contingencies,methods,deps,usage,peerReviews,qualityChecks,events,v2};
 }
 
+// Solo para descarga Excel: texto técnico/contractual íntegro, solicitado bajo demanda.
+export async function loadAuditExport(sql) {
+ return await sql`SELECT r.source_code AS code,
+   a.contractual_basis AS contractual_basis_full, a.technical_basis AS technical_basis_full,
+   a.estimation_exclusions AS exclusions_full,a.source_provenance,
+   v.sdo_baseline AS sdo_baseline_full,v.gap_baseline AS gap_baseline_full,
+   v.sdo_equivalence AS equivalence_full,v.quality_reason AS v2_quality_reason,
+   v.document_references,
+   es.expert_justification AS estimate_justification,
+   es.technical_sources AS estimate_sources
+  FROM ejenp_auditoria_318.requests r
+  LEFT JOIN LATERAL (SELECT * FROM ejenp_auditoria_318.technical_assessments a
+      WHERE a.request_id=r.id ORDER BY a.revision_no DESC,a.id DESC LIMIT 1) a ON TRUE
+  LEFT JOIN LATERAL (SELECT * FROM ejenp_estimacion_v08.eligibility_revisions_v2 v
+      WHERE v.request_id=r.id ORDER BY v.review_version DESC,v.reviewed_at DESC,v.id DESC LIMIT 1) v ON TRUE
+  LEFT JOIN LATERAL (SELECT es.* FROM ejenp_estimacion_v08.estimation_units u
+      JOIN ejenp_estimacion_v08.estimates es ON es.unit_id=u.id
+      WHERE u.request_id=r.id ORDER BY es.revision_no DESC,es.id DESC LIMIT 1) es ON TRUE
+  ORDER BY r.source_code`;
+}
+
 export default async function handler(req,res) {
   responseHeaders(res);
   if(req.method!=='GET') return json(res,405,{error:'Método no permitido'});
@@ -133,6 +154,7 @@ export default async function handler(req,res) {
       const detail=await loadRequestDetail(sql,code);
       return detail ? json(res,200,detail) : json(res,404,{error:'Solicitud no encontrada'});
     }
+    if(view==='export') return json(res,200,{access:'read_only_audit_export',rows:await loadAuditExport(sql)});
     if(view!=='snapshot') return json(res,400,{error:'Vista no disponible'});
     return json(res,200,await loadAuditSnapshot(sql));
   } catch(error) {
