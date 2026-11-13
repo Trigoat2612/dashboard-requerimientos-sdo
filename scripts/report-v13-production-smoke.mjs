@@ -11,7 +11,7 @@ const n=x=>Number(x??0),sum=(rows,k)=>rows.reduce((s,r)=>s+n(r[k]),0);
 async function verify(){
  const home=await fetchData('/');
  assert.equal(home.status,200,'Página de producción inaccesible');
- const bundlePath=home.text.match(/<script[^>]+src="([^"]+\\.js)"/)?.[1];
+ const bundlePath=home.text.match(/<script[^>]+src="([^"]+\.js)"/)?.[1];
  assert.ok(bundlePath,'No se encontró el bundle JavaScript de la aplicación React');
  const bundle=await fetchData(bundlePath);
  assert.equal(bundle.status,200,'El código cliente no se sirve correctamente');
