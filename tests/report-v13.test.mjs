@@ -108,7 +108,7 @@ test('Excel y PPTX del informe contienen XML válido y archivos ZIP íntegros',(
  'if "ppt/presentation.xml" in names:',
  '    assert all("ppt/slides/slide"+str(i)+".xml" in names for i in range(1,13))',
  'print("OK",len(names))'
- ].join('\\n');
+ ].join('\n');
  for(const [type,content] of [['XLSX',xlsx],['PPTX',pptx]]){
   const result=spawnSync('python3',['-c',python],{input:Buffer.from(content).toString('hex'),encoding:'utf8',maxBuffer:1024*1024});
   assert.equal(result.status,0,type+': '+(result.stderr||result.stdout));
