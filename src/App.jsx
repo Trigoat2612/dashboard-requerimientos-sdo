@@ -3,12 +3,20 @@ import InstitutionalLogin from './InstitutionalLogin.jsx';
 import InstitutionalDetailPanel from './InstitutionalDetailPanel.jsx';
 import AuditV2 from './AuditV2.jsx';
 import V09Overview from './V09Overview.jsx';
+import IntegratedAudit from './IntegratedAudit.jsx';
 import GapExplorer from './GapExplorer.jsx';
 import { toSafeCsv } from './csv-utils.js';
 import {Activity,BookOpen,ClipboardList,FileText,Layers,Calculator,Search,RefreshCw,ExternalLink,ChevronRight,CheckCircle2,AlertCircle,Menu,X,Save,Download,Database,Filter,ShieldCheck,Clock3} from 'lucide-react';
 
 const tabs=[
-  {id:'resumen',label:'Resumen ejecutivo V09',icon:Activity},
+  {id:'resumen',label:'Resumen gerencial integral',icon:Activity},
+  {id:'matriz318',label:'Matriz integral · 318 solicitudes',icon:ClipboardList},
+  {id:'obligaciones318',label:'Obligaciones contractuales',icon:BookOpen},
+  {id:'brechasLaboral',label:'331 brechas Laboral',icon:ShieldCheck},
+  {id:'avancev08',label:'Avance estimaciones V08',icon:Calculator},
+  {id:'exclusionesr48',label:'Exclusiones · R48',icon:Filter},
+  {id:'solapamientosv08',label:'Solapamientos y componentes',icon:Layers},
+  {id:'historicoV09',label:'Indicadores V09 anteriores',icon:Clock3},
   {id:'v2',label:'Auditoría y control V00–V08',icon:ShieldCheck},
   {id:'sdo',label:'Cumplimiento SDO · V06',icon:BookOpen},
   {id:'nuevos',label:'Clasificación de solicitudes · V07',icon:ClipboardList},
@@ -31,7 +39,7 @@ function Empty({children}){return <div className="empty"><Search size={30}/><p>{
 export default function App(){
   const [data,setData]=useState({requests:[],sdo:[],documents:[],methods:[],evidence:[],suggestions:[],assessments:[]});
   const [loading,setLoading]=useState(true),[error,setError]=useState(''),[restricted,setRestricted]=useState(false),[publicRedacted,setPublicRedacted]=useState(false);
-  const [active,setActive]=useState('resumen'),[query,setQuery]=useState(''),[typeFilter,setTypeFilter]=useState('Todos'),[areaFilter,setAreaFilter]=useState('Todas'),[statusFilter,setStatusFilter]=useState('Todos'),[levelFilter,setLevelFilter]=useState('Todos los niveles'),[page,setPage]=useState(1);
+  const [active,setActive]=useState(()=>new URLSearchParams(window.location.search).has('req')?'matriz318':'resumen'),[query,setQuery]=useState(''),[typeFilter,setTypeFilter]=useState('Todos'),[areaFilter,setAreaFilter]=useState('Todas'),[statusFilter,setStatusFilter]=useState('Todos'),[levelFilter,setLevelFilter]=useState('Todos los niveles'),[page,setPage]=useState(1);
   const [mobile,setMobile]=useState(false),[navSearch,setNavSearch]=useState(''),[selectedDetail,setSelectedDetail]=useState(null);
   const [institutionalToken,setInstitutionalToken]=useState(null),[identity,setIdentity]=useState(null),[sessionNotice,setSessionNotice]=useState('');
   const loadEpoch=useRef(0);
@@ -175,7 +183,8 @@ export default function App(){
       {assessmentFetch.loading&&['cobertura','auditoria'].includes(active)&&<div className="insight" role="status"><FileText size={18}/><div><b>Cargando trazabilidad documental</b><p>{assessmentFetch.loaded} de {assessmentFetch.total||'…'} evaluaciones recuperadas en lotes autorizados.</p></div></div>}
       {publicRedacted&&active!=='resumen'&&<div className="insight"><ShieldCheck size={18}/><div><b>Consulta disponible · datos protegidos</b><p>El inventario y los análisis documentales, con sus títulos y enlaces, pueden consultarse íntegramente. Los fundamentos independientes V06/V07 se distinguen de las conformidades oficiales.</p></div></div>}
       <header className="page-header"><div><span className="eyebrow">CONTROL Y TRAZABILIDAD</span><h1>{tabs.find(t=>t.id===active)?.label}</h1><p>{active==='v2'?'Avance independiente de la auditoría documental, el cumplimiento SDO, las brechas, las solicitudes y la bolsa de horas.':active==='resumen'?'Corte integrado de V06, V07 y V08 basado en Neon y separado de conformidades oficiales.':active==='historico'?'Vista histórica sin estimaciones sustentadas ni detalles restringidos.':active==='sdo'?'Requisitos SDO codificados y dictámenes propuestos V06; el texto contractual público se conserva; fundamentos V06 detallados requieren autorización.':active==='nuevos'?'Solicitudes clasificadas por V07. El texto original ya público se conserva; condiciones contractuales V07 detalladas requieren autorización.':active==='documentos'?'Inventario documental íntegro: títulos, enlaces y análisis disponibles sin filtros por nombre del archivo.':active==='cobertura'?'Evaluaciones por documento y criterio SDO, diferenciando evidencia de conformidad.':active==='auditoria'?'Auditoría de inventario: vínculo documental no equivale a cumplimiento.':'Contraste de métodos para dimensionar la bolsa de horas y sus riesgos.'}</p></div><span className="live"><span className="green-dot"/> {loading?'Cargando':restricted?'Sin conexión de detalle':publicRedacted?'Datos anonimizados de Neon':publicLegacy?'Consulta pública documental':'Consulta institucional autorizada'}</span></header>
-      {active==='resumen'&&<V09Overview onNavigate={nav}/>}
+      {['resumen','matriz318','obligaciones318','brechasLaboral','avancev08','exclusionesr48','solapamientosv08'].includes(active)&&<IntegratedAudit view={active} onNavigate={nav}/>}
+       {active==='historicoV09'&&<V09Overview onNavigate={nav}/>}
       {active==='v2'&&<AuditV2/>}
       {active==='brechas'&&<GapExplorer onOpenSdo={code=>nav('sdo',code,{kind:'sdo',id:code})} onOpenRequest={code=>nav('nuevos',code,{kind:'request',id:code})}/>}
       {restricted&&['sdo','nuevos','documentos','cobertura','auditoria','metodos','historico'].includes(active)&&<div className="insight"><ShieldCheck size={20}/><div><b>Consulta temporalmente no disponible</b><p>El servicio no entregó metadatos consultables. Los indicadores agregados siguen disponibles en el resumen ejecutivo. Reintenta la conexión; nunca se publicarán datos restringidos sin autorización.</p></div></div>}
