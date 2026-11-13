@@ -40,3 +40,17 @@ jobs:
           V09_PREVIEW_URL: https://dashboard-requerimientos-sd-git-8b1718-miguel-trigosos-projects.vercel.app
           VERCEL_PREVIEW_BYPASS_TOKEN: ${{ secrets.VERCEL_PREVIEW_BYPASS_TOKEN }}
         run: node scripts/preview-smoke.mjs
+
+  production-smoke:
+    name: Verificación HTTP productiva de auditoría integral
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Reconciliar Neon y ficha WBS en producción
+        run: node scripts/audit-production-smoke.mjs
