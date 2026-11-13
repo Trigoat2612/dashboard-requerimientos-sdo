@@ -43,7 +43,7 @@ function Summary({report,onOpen,onNavigate}){
  const actions=[
   ['Alcance original','Las funcionalidades comprendidas en SDO y brechas se atienden mediante las prestaciones originales, sin estimarlas nuevamente.'],
   ['Nuevas propuestas','Las 122 funcionalidades incrementales se someten a evaluación del usuario final para confirmar su necesidad, alcance y prioridad.'],
-  ['Sistemas externos','Las 52 intervenciones directas corresponden a los responsables de esos sistemas; las otras 34 requieren posible reformulación para EJE.'],
+  ['Sistemas externos','Las '+manager.modificacion_sistema_externo+' intervenciones directas corresponden a los responsables de esos sistemas; las otras '+manager.reformular_para_eje+' requieren posible reformulación para EJE.'],
   ['Estimación técnica','Las 13.547,86 horas-persona provienen de actividades WBS/PERT del corte consolidado; no constituyen una autorización de ejecución.']
  ];
  return <div className="ai-flow">
@@ -73,7 +73,7 @@ function Summary({report,onOpen,onNavigate}){
      {phases.slice(0,10).map((p,i)=><Bar key={p.fase} title={p.fase+' · '+p.actividades+' actividades'} value={p.horas} max={maxPhase} annotation={num(p.horas)} color={colors[i%colors.length]}/>)}
      <p className="ai-note">Se muestran las diez fases con más horas. La sección Metodología permite consultar la distribución completa.</p>
    </Section>
-   <Section title="Tratamiento del grupo de sistemas externos" sub="Las 86 solicitudes no se convierten en 86 desarrollos incrementales del EJE.">
+   <Section title="Tratamiento del grupo de sistemas externos" sub={"Las "+manager.sistemas_externos_y_reformulacion+" solicitudes no se convierten automáticamente en desarrollos incrementales del EJE."}>
     <div className="rv-binary"><div><b>{fmt(manager.modificacion_sistema_externo)}</b><span>Cambios directos a sistemas externos</span></div><div><b>{fmt(manager.reformular_para_eje)}</b><span>Alternativas sujetas a reformulación</span></div></div>
     <p className="rv-prose">Cuando se requiere modificar directamente SIJ, REMAJU, SERNOT u otro sistema satélite, corresponde gestionarlo con el responsable respectivo. Una alternativa dentro del EJE debe formularse y contrastarse con las obligaciones originalmente previstas.</p>
    </Section>
@@ -165,7 +165,7 @@ function Criteria({report,openDetail,onNavigate}){
   ALCANCE_SDO:['Funcionalidad comprendida en los requerimientos originales SDO','Existe correspondencia documentada con una obligación inicialmente prevista','No incrementar bolsa; verificar implementación','Softplan: atender el alcance original'],
   ALCANCE_BRECHA:['Funcionalidad asociada a brechas del alcance original','La brecha forma parte de los compromisos funcionales existentes','No incrementar bolsa; atender la brecha','Responsable contractual: resolver y validar'],
   DUPLICADO:['Solicitud cuya función ya está representada por otra','Existe requerimiento maestro o función equivalente identificada','Evitar doble conteo','Consolidar y asociar a la solicitud principal'],
-  EXTERNO_O_REFORMULACION:['Cambio directo a satélite o alternativa para el EJE por delimitar','52 cambios directos externos y 34 reformulaciones posibles','Fuera de horas EJE mientras no exista nueva propuesta definida','GTI/GSJ: gestionar sistema externo o reformular'],
+  EXTERNO_O_REFORMULACION:['Cambio directo a satélite o alternativa para el EJE por delimitar','Cambios directos y reformulaciones según la distribución del informe','Fuera de horas EJE mientras no exista nueva propuesta definida','GTI/GSJ: gestionar sistema externo o reformular'],
   CONFIGURACIONES_Y_AJUSTES:['Ajuste o parametrización sobre una funcionalidad contratada','No se identifica funcionalidad incremental propia','Resolver sin sumar horas incrementales','Verificar configuración y ajuste con responsable']
  };
  const methods=report.methods||[];
@@ -216,7 +216,7 @@ function Exclusions({report,openDetail}){
  const [filters,setFilters]=useState({...emptyFilters,category:''}),[page,setPage]=useState(1),size=25;
  const all=report.rows.filter(r=>!isIncremental(r)),rows=filterReport(all,filters);
  useEffect(()=>setPage(1),[filters]);
- return <div className="ai-flow"><div className="rv-intro"><b>{fmt(all.length)} solicitudes clasificadas en otras categorías</b><span>Las 86 relacionadas con sistemas externos mantienen su desglose: 52 cambios directos y 34 solicitudes para eventual reformulación.</span></div>
+ return <div className="ai-flow"><div className="rv-intro"><b>{fmt(all.length)} solicitudes clasificadas en otras categorías</b><span>De las {fmt(report.manager.sistemas_externos_y_reformulacion)} solicitudes: {fmt(report.manager.modificacion_sistema_externo)} cambios directos y {fmt(report.manager.reformular_para_eje)} solicitudes para eventual reformulación.</span></div>
  <Toolbar rows={all} filters={filters} setFilters={setFilters} report={report}/>
  <Table heads={['Solicitud','Clasificación','Caso particular','Sistema afectado','Motivo individual de exclusión','Recomendación','Horas incrementales','Detalle']}>
  {rows.slice((page-1)*size,page*size).map(r=><tr key={r.code}><td><b>{r.code}</b></td><td><Chip category={r.categoria_resumen_v13}>{r.categoria_visible_v13}</Chip></td>
