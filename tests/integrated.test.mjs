@@ -20,7 +20,7 @@ test('horas técnicas firmes y condicionales se separan y excluidos conservan ce
  assert.equal(m.firmHours.pert,17);assert.equal(m.conditionalHours.pert,15);
  assert.equal(m.qaHours,null);assert.equal(m.contractApproved,null);
  assert.equal(exportColumns(rows[2])[19],0);assert.equal(exportColumns(rows[3])[19],'');
- assert.equal(exportHeaders.length,31);
+ assert.equal(exportHeaders.length,41);
 });
 test('filtros combinables de área, elegibilidad, horas y SDO',()=>{
  assert.deepEqual(filteredRequests(rows,{area:'Arquitectura',eligibility:'INCREMENTAL',onlySdo:true}).map(x=>x.code),['REQ00001']);
