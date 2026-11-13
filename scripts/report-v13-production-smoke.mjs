@@ -11,6 +11,13 @@ const n=x=>Number(x??0),sum=(rows,k)=>rows.reduce((s,r)=>s+n(r[k]),0);
 async function verify(){
  const home=await fetchData('/');
  assert.equal(home.status,200,'Página de producción inaccesible');
+ const bundlePath=home.text.match(/<script[^>]+src="([^"]+\\.js)"/)?.[1];
+ assert.ok(bundlePath,'No se encontró el bundle JavaScript de la aplicación React');
+ const bundle=await fetchData(bundlePath);
+ assert.equal(bundle.status,200,'El código cliente no se sirve correctamente');
+ assert.ok(bundle.text.includes('Funcionalidades incrementales'),'No se encontró la pestaña funcional del informe en el cliente');
+ assert.ok(bundle.text.includes('Criterios y metodología'),'No se encontró la sección metodológica en el cliente');
+ assert.ok(bundle.text.includes('/api/report-v13'),'El módulo cliente no consume la API institucional');
  const snap=await fetchData('/api/report-v13?view=snapshot');
  assert.equal(snap.status,200,'Snapshot institucional no responde 200');
  const d=snap.body;assert.equal(d.access,'public_readonly_report');
