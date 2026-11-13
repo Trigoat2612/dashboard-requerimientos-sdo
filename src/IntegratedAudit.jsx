@@ -248,6 +248,7 @@ function RequestDetail({code,onClose,onSdo}){
 }
 export default function IntegratedAudit({view='resumen',onNavigate=()=>{}}){
  const [state,setState]=useState({loading:true,snapshot:null,error:''});
+ const [exportBusy,setExportBusy]=useState(false),[exportError,setExportError]=useState('');
  const [filters,setFilters]=useState(initialFilters),[page,setPage]=useState(1),[orderBy,setOrderBy]=useState('code'),[ascending,setAscending]=useState(true),[detail,setDetail]=useState(()=>new URLSearchParams(window.location.search).get('req'));
  const pageSize=25;
  const refresh=useCallback(async(force=false)=>{setState(p=>({...p,loading:true,error:''}));try{const snapshot=await fetchSnapshot(force);setState({loading:false,snapshot,error:''})}catch(e){setState(p=>({...p,loading:false,error:e.message||'Error de conexión'}))}},[]);
@@ -263,12 +264,23 @@ export default function IntegratedAudit({view='resumen',onNavigate=()=>{}}){
  },[view,filtered,orderBy,ascending]);
  const metrics=useMemo(()=>summarize(filtered,snap?.overlaps||[]),[filtered,snap]);
  const visible=matched.slice((page-1)*pageSize,page*pageSize);
+ const exportFull=async()=>{setExportBusy(true);setExportError('');
+  try{
+   const res=await fetch('/api/integrated-audit?view=export',{cache:'no-store'});
+   const payload=await res.json();if(!res.ok||payload.access!=='read_only_audit_export')throw Error(payload.error||'No se pudo preparar la matriz de exportación');
+   const index=new Map(payload.rows.map(r=>[r.code,r]));
+   if(index.size!==318)throw Error('La exportación no contiene los 318 requisitos originales');
+   if(filtered.some(r=>!index.has(r.code)))throw Error('Faltan referencias al contrastar el Excel con la matriz visible');
+   exportAuditXlsx(filtered.map(r=>({...r,...index.get(r.code)})));
+  }catch(e){setExportError(e.message||'No se pudo exportar')}finally{setExportBusy(false)}
+ };
  const setView=(key)=>{closeDetail();onNavigate(key)};
  return <div className="ai-shell">
  <div className="ai-head"><div><span className="ai-eyebrow">V09 · AUDITORÍA CONTRACTUAL Y ESTIMACIÓN INCREMENTAL</span>
  <h2>{detail?'Detalle de requerimiento':view==='resumen'?'Diagnóstico ejecutivo consolidado':view==='matriz318'?'Matriz integral de 318 solicitudes':view==='obligaciones318'?'Obligaciones contractuales de Softplan':view==='brechasLaboral'?'Brechas Laboral y trazabilidad SDO':view==='avancev08'?'Avance de estimación V08':view==='exclusionesr48'?'Exclusiones R48':view==='solapamientosv08'?'Solapamientos y componentes compartidos':'Auditoría integral'}</h2>
  <p>Fuente Neon · corte dinámico {snap?.generatedAt?new Date(snap.generatedAt).toLocaleString('es-PE'):'pendiente'} · todas las horas son técnicas, no aprobaciones contractuales</p></div>
  <button className="ai-btn secondary" disabled={state.loading} onClick={()=>refresh(true)}><RefreshCw size={16} className={state.loading?'spin':''}/> Actualizar Neon</button></div>
+ {exportError&&<div className="ai-error" role="alert">Error de exportación: {exportError}</div>}
  {state.error&&<div className="ai-error"><AlertTriangle size={19}/><div>{state.error}<small>La consulta histórica de documentos sigue disponible en el dashboard original.</small></div></div>}
  {state.loading&&!snap&&<div className="ai-loading">Consultando 318 solicitudes, brechas Laboral y estimaciones WBS en Neon…</div>}
  {snap&&<>
@@ -276,7 +288,7 @@ export default function IntegratedAudit({view='resumen',onNavigate=()=>{}}){
  <>
  {['resumen','matriz318','obligaciones318'].includes(view)&&<FilterBar rows={all} filters={filters} setFilters={setFilters} clear={()=>setFilters({...initialFilters})}/>}
  <div className="ai-toolbar"><span><Filter size={14}/>{fmt(filtered.length)} de {fmt(all.length)} solicitudes {view==='brechasLaboral'?'· '+fmt(snap.gaps.length)+' registros Laboral':''}</span>
- <div><button className="ai-btn secondary" onClick={()=>exportAuditXlsx(filtered)}><Download size={15}/> Excel 318</button><button className="ai-btn primary" onClick={()=>exportAuditPptx(snap,filtered)}><BarChart3 size={15}/> PowerPoint gerencial</button></div></div>
+ <div><button className="ai-btn secondary" disabled={exportBusy} onClick={exportFull}><Download size={15}/> {exportBusy?"Preparando Excel…":"Excel 318 completo"}</button><button className="ai-btn primary" onClick={()=>exportAuditPptx(snap,filtered)}><BarChart3 size={15}/> PowerPoint gerencial</button></div></div>
  {view==='resumen'&&<Overview rows={filtered} snapshot={snap} m={metrics} onOpen={openDetail} onSwitch={setView}/>}
  {view==='matriz318'&&<><div className="ai-toolbar"><span>Orden de la matriz</span><div><select className="ai-order" value={orderBy} onChange={e=>setOrderBy(e.target.value)}><option value="code">Código</option><option value="area">Área</option><option value="eligibility">Elegibilidad</option><option value="v08_agent">Agente V08</option><option value="estimate_status">Estado V08</option><option value="hours">Horas PERT</option></select><button className="ai-btn secondary" onClick={()=>setAscending(p=>!p)}>{ascending?'Ascendente':'Descendente'}</button></div></div><Matrix rows={visible} onOpen={openDetail}/><Pagination page={page} setPage={setPage} total={matched.length} pageSize={pageSize}/></>}
  {view==='obligaciones318'&&<Obligations rows={filtered} sdoCatalog={snap.sdo||[]} onOpen={openDetail} onSdo={code=>onNavigate('sdo',code,{kind:'sdo',id:code})}/>}
