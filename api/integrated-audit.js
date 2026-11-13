@@ -11,7 +11,7 @@ const json = (res, status, body) => res.status(status).json(body);
 export async function loadAuditSnapshot(sql) {
   // Una fila por solicitud. Relaciones N:M se agregan como arreglos, no como JOIN multiplicador.
   const [requests, gaps, agents, overlaps, components, exclusionReviews, sdo] = await Promise.all([
-    sql\`
+    sql`
       SELECT r.id, r.source_code AS code, r.batch_code AS batch, r.source_sheet,
         r.source_row, r.area, r.request_text AS description, r.created_at AS source_date,
         a.id AS assessment_id, a.revision_no AS v07_revision, a.author_agent AS v07_agent,
@@ -53,8 +53,8 @@ export async function loadAuditSnapshot(sql) {
          WHERE s.request_id=r.id ORDER BY s.revision_no DESC,s.estimate_id DESC LIMIT 1) s ON TRUE
       LEFT JOIN LATERAL (SELECT * FROM ejenp_estimacion_v08.exclusions_zero x
          WHERE x.request_id=r.id LIMIT 1) x ON TRUE
-      ORDER BY r.source_code,r.id\`,
-    sql\`
+      ORDER BY r.source_code,r.id`,
+    sql`
       SELECT i.id, i.record_class, i.source_gap_code AS gap_code, i.source_sdo_code AS sdo_code,
         i.source_request_code AS request_code, i.source_description AS description,
         i.source_solution, i.source_final_status, i.source_sheet, i.source_row,
@@ -64,16 +64,16 @@ export async function loadAuditSnapshot(sql) {
       LEFT JOIN LATERAL (SELECT e.* FROM ejenp_v14_brechas.evaluations e
         JOIN ejenp_v14_brechas.review_queue q ON q.id=e.queue_id
         WHERE q.item_id=i.id ORDER BY e.revision_no DESC,e.reviewed_at DESC,e.id DESC LIMIT 1) ev ON TRUE
-      ORDER BY i.id\`,
-    sql\`SELECT agent_id,focus,assigned,pending,in_progress,estimated,blocked,superseded,conditional
-      FROM ejenp_estimacion_v08.monitoring ORDER BY agent_id\`,
-    sql\`SELECT request_a,request_b,code_a,code_b,relation_types,agent_a,agent_b,status,
+      ORDER BY i.id`,
+    sql`SELECT agent_id,focus,assigned,pending,in_progress,estimated,blocked,superseded,conditional
+      FROM ejenp_estimacion_v08.monitoring ORDER BY agent_id`,
+    sql`SELECT request_a,request_b,code_a,code_b,relation_types,agent_a,agent_b,status,
        resolution_basis,reviewed_by,validated_at FROM ejenp_estimacion_v08.overlap_guard_v2
-       ORDER BY code_a,code_b\`,
-    sql\`SELECT component_key,description,owner_agent,status,dependencies
-       FROM ejenp_estimacion_v08.shared_components ORDER BY component_key\`,
-    sql\`SELECT request_id,source_code,category,technical_reason FROM ejenp_estimacion_v08.exclusions_zero ORDER BY request_id\`,
-    sql\`SELECT code,description,verification_status FROM ejenp_requerimientos_sdo.sdo_requirements ORDER BY code\`
+       ORDER BY code_a,code_b`,
+    sql`SELECT component_key,description,owner_agent,status,dependencies
+       FROM ejenp_estimacion_v08.shared_components ORDER BY component_key`,
+    sql`SELECT request_id,source_code,category,technical_reason FROM ejenp_estimacion_v08.exclusions_zero ORDER BY request_id`,
+    sql`SELECT code,description,verification_status FROM ejenp_requerimientos_sdo.sdo_requirements ORDER BY code`
   ]);
   // La revisión paralela R48 no dispone todavía de un registro específico consultable.
   // Se expone la decisión V2 vigente y se distingue la inexistencia de una resolución R48.
@@ -86,35 +86,35 @@ export async function loadAuditSnapshot(sql) {
 }
 
 export async function loadRequestDetail(sql, code) {
-  const match = await sql\`SELECT id,source_code,batch_code,source_sheet,source_row,area,request_text,
-    raw_record,created_at FROM ejenp_auditoria_318.requests WHERE source_code=\${code} LIMIT 1\`;
+  const match = await sql`SELECT id,source_code,batch_code,source_sheet,source_row,area,request_text,
+    raw_record,created_at FROM ejenp_auditoria_318.requests WHERE source_code=${code} LIMIT 1`;
   if(!match.length) return null;
   const request=match[0], id=request.id;
   const [assessments,qa,conditions,sdoLinks,gapLinks,documents,units,related,overlaps]=await Promise.all([
-    sql\`SELECT * FROM ejenp_auditoria_318.technical_assessments WHERE request_id=\${id} ORDER BY revision_no,id\`,
-    sql\`SELECT q.* FROM ejenp_auditoria_318.quality_reviews q JOIN ejenp_auditoria_318.technical_assessments a ON a.id=q.assessment_id WHERE a.request_id=\${id} ORDER BY q.created_at,q.id\`,
-    sql\`SELECT c.* FROM ejenp_auditoria_318.pending_conditions c JOIN ejenp_auditoria_318.technical_assessments a ON a.id=c.assessment_id WHERE a.request_id=\${id} ORDER BY c.id\`,
-    sql\`SELECT l.*,s.description AS sdo_description,s.verification_status FROM ejenp_auditoria_318.sdo_links l LEFT JOIN ejenp_requerimientos_sdo.sdo_requirements s ON s.code=l.sdo_code WHERE l.request_id=\${id} ORDER BY l.sdo_code\`,
-    sql\`SELECT l.*,g.source_gap_code,g.source_description,g.source_sdo_code FROM ejenp_auditoria_318.gap_links l LEFT JOIN ejenp_v14_brechas.items g ON g.id=l.gap_item_id WHERE l.request_id=\${id} ORDER BY l.gap_item_id\`,
-    sql\`SELECT e.* FROM ejenp_auditoria_318.assessment_evidence e JOIN ejenp_auditoria_318.technical_assessments a ON a.id=e.assessment_id WHERE a.request_id=\${id} ORDER BY e.id\`,
-    sql\`SELECT u.*, v.id AS estimate_id,v.methodology,v.expert_justification,v.technical_sources,v.scope_basis,v.exclusions_basis,v.conditional_assumptions,v.confidence AS estimate_confidence,v.contractual_status,v.created_at AS estimated_at
-      FROM ejenp_estimacion_v08.estimation_units u LEFT JOIN ejenp_estimacion_v08.estimates v ON v.unit_id=u.id WHERE u.request_id=\${id} ORDER BY u.id DESC\`,
-    sql\`SELECT l.*,r.source_code AS related_code FROM ejenp_auditoria_318.request_relations l LEFT JOIN ejenp_auditoria_318.requests r ON r.id=l.related_request_id WHERE l.request_id=\${id} ORDER BY l.created_at\`,
-    sql\`SELECT * FROM ejenp_estimacion_v08.overlap_guard_v2 WHERE request_a=\${id} OR request_b=\${id}\`
+    sql`SELECT * FROM ejenp_auditoria_318.technical_assessments WHERE request_id=${id} ORDER BY revision_no,id`,
+    sql`SELECT q.* FROM ejenp_auditoria_318.quality_reviews q JOIN ejenp_auditoria_318.technical_assessments a ON a.id=q.assessment_id WHERE a.request_id=${id} ORDER BY q.created_at,q.id`,
+    sql`SELECT c.* FROM ejenp_auditoria_318.pending_conditions c JOIN ejenp_auditoria_318.technical_assessments a ON a.id=c.assessment_id WHERE a.request_id=${id} ORDER BY c.id`,
+    sql`SELECT l.*,s.description AS sdo_description,s.verification_status FROM ejenp_auditoria_318.sdo_links l LEFT JOIN ejenp_requerimientos_sdo.sdo_requirements s ON s.code=l.sdo_code WHERE l.request_id=${id} ORDER BY l.sdo_code`,
+    sql`SELECT l.*,g.source_gap_code,g.source_description,g.source_sdo_code FROM ejenp_auditoria_318.gap_links l LEFT JOIN ejenp_v14_brechas.items g ON g.id=l.gap_item_id WHERE l.request_id=${id} ORDER BY l.gap_item_id`,
+    sql`SELECT e.* FROM ejenp_auditoria_318.assessment_evidence e JOIN ejenp_auditoria_318.technical_assessments a ON a.id=e.assessment_id WHERE a.request_id=${id} ORDER BY e.id`,
+    sql`SELECT u.*, v.id AS estimate_id,v.methodology,v.expert_justification,v.technical_sources,v.scope_basis,v.exclusions_basis,v.conditional_assumptions,v.confidence AS estimate_confidence,v.contractual_status,v.created_at AS estimated_at
+      FROM ejenp_estimacion_v08.estimation_units u LEFT JOIN ejenp_estimacion_v08.estimates v ON v.unit_id=u.id WHERE u.request_id=${id} ORDER BY u.id DESC`,
+    sql`SELECT l.*,r.source_code AS related_code FROM ejenp_auditoria_318.request_relations l LEFT JOIN ejenp_auditoria_318.requests r ON r.id=l.related_request_id WHERE l.request_id=${id} ORDER BY l.created_at`,
+    sql`SELECT * FROM ejenp_estimacion_v08.overlap_guard_v2 WHERE request_a=${id} OR request_b=${id}`
   ]);
   const estimateId=units.find(u=>u.estimate_id)?.estimate_id;
   const [wbs,risks,assumptions,contingencies,methods,deps,usage,peerReviews,qualityChecks,events,v2]=await Promise.all([
-    estimateId ? sql\`SELECT * FROM ejenp_estimacion_v08.wbs_tasks WHERE estimate_id=\${estimateId} ORDER BY activity_code,id\` : Promise.resolve([]),
-    estimateId ? sql\`SELECT * FROM ejenp_estimacion_v08.risk_register WHERE estimate_id=\${estimateId} ORDER BY id\` : Promise.resolve([]),
-    estimateId ? sql\`SELECT * FROM ejenp_estimacion_v08.technical_assumptions WHERE estimate_id=\${estimateId} ORDER BY id\` : Promise.resolve([]),
-    estimateId ? sql\`SELECT * FROM ejenp_estimacion_v08.contingencies WHERE estimate_id=\${estimateId} ORDER BY id\` : Promise.resolve([]),
-    estimateId ? sql\`SELECT * FROM ejenp_estimacion_v08.functional_sizes WHERE estimate_id=\${estimateId} ORDER BY id\` : Promise.resolve([]),
-    sql\`SELECT d.* FROM ejenp_estimacion_v08.dependencies d JOIN ejenp_estimacion_v08.estimation_units u ON u.id=d.unit_id WHERE u.request_id=\${id} ORDER BY d.id\`,
-    sql\`SELECT cu.* FROM ejenp_estimacion_v08.component_usage cu JOIN ejenp_estimacion_v08.estimation_units u ON u.id=cu.unit_id WHERE u.request_id=\${id} ORDER BY cu.id\`,
-    estimateId ? sql\`SELECT * FROM ejenp_estimacion_v08.peer_reviews WHERE estimate_id=\${estimateId} ORDER BY created_at\` : Promise.resolve([]),
-    estimateId ? sql\`SELECT * FROM ejenp_estimacion_v08.quality_checks WHERE estimate_id=\${estimateId} ORDER BY created_at\` : Promise.resolve([]),
-    sql\`SELECT ev.* FROM ejenp_estimacion_v08.audit_events ev JOIN ejenp_estimacion_v08.estimation_units u ON u.id=ev.unit_id WHERE u.request_id=\${id} ORDER BY ev.created_at,ev.id\`,
-    sql\`SELECT * FROM ejenp_estimacion_v08.eligibility_revisions_v2 WHERE request_id=\${id} ORDER BY review_version,reviewed_at,id\`
+    estimateId ? sql`SELECT * FROM ejenp_estimacion_v08.wbs_tasks WHERE estimate_id=${estimateId} ORDER BY activity_code,id` : Promise.resolve([]),
+    estimateId ? sql`SELECT * FROM ejenp_estimacion_v08.risk_register WHERE estimate_id=${estimateId} ORDER BY id` : Promise.resolve([]),
+    estimateId ? sql`SELECT * FROM ejenp_estimacion_v08.technical_assumptions WHERE estimate_id=${estimateId} ORDER BY id` : Promise.resolve([]),
+    estimateId ? sql`SELECT * FROM ejenp_estimacion_v08.contingencies WHERE estimate_id=${estimateId} ORDER BY id` : Promise.resolve([]),
+    estimateId ? sql`SELECT * FROM ejenp_estimacion_v08.functional_sizes WHERE estimate_id=${estimateId} ORDER BY id` : Promise.resolve([]),
+    sql`SELECT d.* FROM ejenp_estimacion_v08.dependencies d JOIN ejenp_estimacion_v08.estimation_units u ON u.id=d.unit_id WHERE u.request_id=${id} ORDER BY d.id`,
+    sql`SELECT cu.* FROM ejenp_estimacion_v08.component_usage cu JOIN ejenp_estimacion_v08.estimation_units u ON u.id=cu.unit_id WHERE u.request_id=${id} ORDER BY cu.id`,
+    estimateId ? sql`SELECT * FROM ejenp_estimacion_v08.peer_reviews WHERE estimate_id=${estimateId} ORDER BY created_at` : Promise.resolve([]),
+    estimateId ? sql`SELECT * FROM ejenp_estimacion_v08.quality_checks WHERE estimate_id=${estimateId} ORDER BY created_at` : Promise.resolve([]),
+    sql`SELECT ev.* FROM ejenp_estimacion_v08.audit_events ev JOIN ejenp_estimacion_v08.estimation_units u ON u.id=ev.unit_id WHERE u.request_id=${id} ORDER BY ev.created_at,ev.id`,
+    sql`SELECT * FROM ejenp_estimacion_v08.eligibility_revisions_v2 WHERE request_id=${id} ORDER BY review_version,reviewed_at,id`
   ]);
   return {request,assessments,qa,conditions,sdoLinks,gapLinks,documents,units,related,overlaps,
     wbs,risks,assumptions,contingencies,methods,deps,usage,peerReviews,qualityChecks,events,v2};
