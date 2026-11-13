@@ -31,7 +31,7 @@ export function reconcileV13({manager,categories,rows,phases,byCode}){
 }
 
 export async function loadSnapshot(sql){
- const [managers,categories,rows,phases,byCode,sdo,gaps]=await Promise.all([
+ const [managers,categories,rows,phases,byCode,sdo,gaps,methods]=await Promise.all([
   sql`SELECT * FROM ejenp_estimacion_v08.v00_informe_gerencial_v13`,
   sql`SELECT * FROM ejenp_estimacion_v08.v00_informe_categorias_v13`,
   sql`SELECT request_id,code,descripcion,especialidad,lote,hoja_fuente,fila_fuente,
@@ -45,12 +45,13 @@ export async function loadSnapshot(sql){
   sql`SELECT fase,COUNT(*)::integer actividades,ROUND(SUM(horas_pert),3) horas FROM ejenp_estimacion_v08.v00_informe_wbs_122_v13 GROUP BY fase ORDER BY horas DESC`,
   sql`SELECT codigo,COUNT(*)::integer actividades,ROUND(SUM(horas_pert),3) horas_pert FROM ejenp_estimacion_v08.v00_informe_wbs_122_v13 GROUP BY codigo ORDER BY codigo`,
   sql`SELECT code,description,verification_status,source_document_id FROM ejenp_requerimientos_sdo.sdo_requirements ORDER BY code`,
-  sql`SELECT id,source_gap_code AS gap_code,source_sdo_code AS sdo_code,source_request_code AS request_code,source_description AS description,source_final_status,source_sheet,source_row FROM ejenp_v14_brechas.items ORDER BY id`
+  sql`SELECT id,source_gap_code AS gap_code,source_sdo_code AS sdo_code,source_request_code AS request_code,source_description AS description,source_final_status,source_sheet,source_row FROM ejenp_v14_brechas.items ORDER BY id`,
+  sql`SELECT name,supplier_proposed,description,strengths,risks,decision,source_document_id FROM ejenp_requerimientos_sdo.methodology_reviews ORDER BY supplier_proposed DESC,name`
  ]);
  const manager=managers[0];
  const reconciliation=reconcileV13({manager,categories,rows,phases,byCode});
  return {access:'public_readonly_report',source:'Neon · informe técnico consolidado',
-  generatedAt:new Date().toISOString(),manager,categories,rows,phases,byCode,sdo,gaps,reconciliation};
+  generatedAt:new Date().toISOString(),manager,categories,rows,phases,byCode,sdo,gaps,methods,reconciliation};
 }
 export async function loadDetail(sql,code){
  const [matrix,wbs,sdoLinks,gapLinks,evidence,assessments]=await Promise.all([
