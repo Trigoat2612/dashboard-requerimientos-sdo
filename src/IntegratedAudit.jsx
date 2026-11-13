@@ -185,36 +185,86 @@ function GapTable({gaps,rows,onOpen,onSdo}){
  </tr>})}</Tabular><Pagination page={page} setPage={setPage} total={filtered.length} pageSize={pageSize}/>
  </Block>;
 }
+
 function AgentProgress({snap,rows,onOpen}){
- const agents=snap.agents||[];
- return <Block title="Avance por especialidad y agente V08" subtitle="Las cifras mostradas se recalculan con las solicitudes filtradas; el estado operativo global se indica debajo.">
- <Tabular headers={['Agente / especialidad','Asignadas','En curso','Estimadas','Pendientes','Bloqueadas','Horas firmes PERT','Horas condicionadas PERT','QA','Solicitudes']}>
- {agents.map(a=>{const mine=rows.filter(r=>r.v08_agent===a.agent_id),est=mine.filter(isEstimated);
- return <tr key={a.agent_id}><td><b>{a.agent_id}</b><small>{a.focus}</small></td><td>{mine.length}</td><td>{mine.filter(r=>r.estimate_status==='En curso').length}</td><td>{est.length}</td><td>{mine.filter(r=>r.estimate_status==='Pendiente').length}</td><td>{mine.filter(r=>r.estimate_status==='Bloqueado').length}</td>
- <td>{fmtHours(est.filter(r=>r.eligibility==='INCREMENTAL').reduce((s,r)=>s+Number(r.pert_expected||0),0))}</td>
- <td>{fmtHours(est.filter(r=>r.eligibility==='CONDICIONAL').reduce((s,r)=>s+Number(r.pert_expected||0),0))}</td><td>{est.filter(r=>!r.qa_outcome).length} pendiente(s)</td>
- <td><details><summary>Ver {mine.length} solicitudes</summary>{mine.map(r=><button key={r.code} className="ai-link" onClick={()=>onOpen(r.code)}>{r.code}</button>)}</details></td></tr>})}</Tabular>
- <p className="ai-note">Estado operativo Neon: {agents.reduce((s,a)=>s+Number(a.assigned||0),0)} asignadas; {agents.reduce((s,a)=>s+Number(a.estimated||0),0)} estimadas. Las horas de esta tabla corresponden únicamente a la selección filtrada.</p>
- </Block>;
+ return <div className="ai-flow">
+ <Block title="Estimaciones por ventana y especialidad" subtitle="La WBS histórica no implica novedad. El esfuerzo reconocido se suma solo si la solicitud es NUEVO_EJE en V00 V9.">
+ <Tabular headers={['Agente / especialidad','Asignadas','WBS históricas','Novedades reconocidas V9','PERT final EJE','PERT bruto histórico','QA / observaciones','Solicitudes']}>
+ {(snap.agents||[]).map(a=>{
+  const mine=rows.filter(r=>r.v08_agent===a.agent_id);
+  const newRows=mine.filter(r=>r.final_new);
+  const total=newRows.reduce((n,r)=>n+Number(r.final_pert||0),0);
+  const brute=mine.reduce((n,r)=>n+Number(r.horas_pert_brutas||0),0);
+  return <tr key={a.agent_id}>
+   <td><b>{a.agent_id}</b><small>{a.focus}</small></td>
+   <td>{fmt(mine.length)}</td><td>{fmt(mine.filter(isEstimated).length)}</td>
+   <td><b>{newRows.length}</b></td><td className="ai-num"><b>{fmtHours(total)}</b></td>
+   <td className="ai-num">{fmtHours(brute)}</td>
+   <td><small>{mine.filter(x=>x.final_decision==='NOVEDAD_NO_ACREDITADA').length} sin novedad acreditada</small><small>{mine.filter(x=>x.final_decision==='CAMBIO_EXTERNO').length} externos</small></td>
+   <td><details><summary>{mine.length} solicitudes</summary>{mine.map(r=><button key={r.code} className="ai-link" onClick={()=>onOpen(r.code)}>{r.code}</button>)}</details></td>
+  </tr>;
+ })}</Tabular>
+ </Block>
+ <p className="ai-note">Las asignaciones y trabajos originales permanecen visibles como historial V08. El cierre de novedad técnica prevalece para totalización y presentación ejecutiva.</p>
+ </div>;
 }
 function Exclusions({rows,onOpen,r48}){
- const source=rows.filter(r=>['CONFIGURACION_SIN_INCREMENTO','FUERA_ALCANCE_BOLSA'].includes(r.source_category||r.v07_category));
- return <Block title="Exclusiones en revisión paralela R48" subtitle="Se conserva la decisión V2 y se distingue de una revisión R48 no registrada. El universo histórico de 48 debe conciliarse con la clasificación actual.">
- <div className="ai-callout"><AlertTriangle size={19}/><span>{r48?.notice||'R48 sin resolución verificable.'} Se identifican {source.length} solicitudes según categorías actualmente registradas.</span></div>
- <Tabular headers={['Solicitud','Clasificación anterior','Dictamen V2 actual','Cobertura SDO / brecha','Equivalencia','Estado R48','Evaluación y evidencia']}>
- {source.map(r=><tr key={r.code}><td><button className="ai-btn small" onClick={()=>onOpen(r.code)}>{r.code}</button><small>{r.description.slice(0,135)}</small></td><td>{labels[r.source_category||r.v07_category]||r.source_category||r.v07_category}</td><td><Chip>{labels[r.eligibility]||r.eligibility}</Chip><small>{r.v2_decision}</small></td><td>SDO: {(r.sdo_links||[]).map(s=>s.code).join(', ')||'No localizado'}<small>Brechas: {(r.gap_links||[]).map(g=>g.id).join(', ')||'No registradas'}</small></td><td className="ai-long">{alt(r.sdo_equivalence,r.original_covered_scope)}</td><td><Chip tone="conditional">Pendiente de registro R48</Chip></td><td>{alt(r.quality_reason,r.technical_basis)}</td></tr>)}</Tabular>
- </Block>;
+ const [search,setSearch]=useState(''),[choice,setChoice]=useState(''),[page,setPage]=useState(1);
+ const decisionMap=new Map((r48?.scope||[]).map(x=>[x.source_code,x]));
+ const resolutionMap=new Map((r48?.resolutions||[]).map(x=>[x.source_code,x]));
+ const all=rows.filter(r=>!r.final_new);
+ const selected=all.filter(r=>(!choice||r.final_decision===choice)&&[r.code,r.description,r.final_reason,r.final_decision,r.final_system].join(' ').toLowerCase().includes(search.toLowerCase()));
+ const list=selected.slice((page-1)*30,page*30);
+ const decisionOptions=[...new Set(all.map(r=>r.final_decision).filter(Boolean))].sort();
+ return <div className="ai-flow">
+  <Block title="Exclusiones y decisiones R48" subtitle="Se recuperan las revisiones R48 V4/V5 y se conserva la decisión técnica V00 V9 como autoridad final de novedad.">
+   <div className="ai-facts"><span>Dictámenes R48 V4: <b>{(r48?.scope||[]).length}</b></span>
+     <span>Resoluciones R48 V5: <b>{(r48?.resolutions||[]).length}</b></span>
+     <span>Solicitudes sin novedad acreditada: <b>{all.length}</b></span>
+     <span>Versiones: <b>V00 final V9 + R48 V4/V5</b></span></div>
+   <div className="ai-inline"><input placeholder="Buscar código, sistema, exclusión o fundamento…" value={search} onChange={e=>{setSearch(e.target.value);setPage(1)}}/>
+   <select className="ai-order" value={choice} onChange={e=>{setChoice(e.target.value);setPage(1)}}><option value="">Todas las categorías</option>{decisionOptions.map(c=><option value={c} key={c}>{labels[c]||c}</option>)}</select></div>
+   <Tabular headers={['Solicitud','Decisión final V00 V9','Sistema / propietario','Obligación base / exclusión','PERT bruto no admitido','Dictamen R48 (si existe)','Fundamento','Abrir']}>
+   {list.map(r=>{
+    const v4=decisionMap.get(r.code),v5=resolutionMap.get(r.code);
+    return <tr key={r.code}>
+     <td><b>{r.code}</b><small>{r.description?.slice(0,120)}</small></td>
+     <td><Chip>{labels[r.final_decision]||r.final_decision}</Chip></td>
+     <td>{r.final_system||v5?.target_system||v4?.target_system||'No consignado'}</td>
+     <td className="ai-long">{r.funcion_originalmente_exigible||'Sin cobertura original específica'}<small>{r.motivo_exclusion_y_recomendacion||''}</small></td>
+     <td className="ai-num">{fmtHours(r.final_excluded_hours)}</td>
+     <td>{v4&&<div><Chip>{v4.final_decision}</Chip><small>{v4.decided_at}</small></div>}
+       {v5&&<div><Chip>{v5.decision}</Chip><small>{v5.decided_at}</small></div>}
+       {!v4&&!v5&&'Sin resolución R48 específica'}</td>
+     <td className="ai-long">{r.final_reason}</td>
+     <td><button className="ai-btn small" onClick={()=>onOpen(r.code)}>Ficha</button></td>
+    </tr>;
+   })}</Tabular><Pagination page={page} setPage={setPage} total={selected.length} pageSize={30}/>
+  </Block>
+ </div>;
 }
 function Overlaps({snap,rows,onOpen}){
- const byId=new Map(rows.map(r=>[String(r.id),r.code]));
+ const selected=(snap.overlaps||[]).filter(o=>rows.some(r=>r.code===o.code_a||r.code===o.code_b));
  return <div className="ai-flow">
- <Block title="Solapamientos y doble contabilización" subtitle="Una relación pendiente no constituye automáticamente duplicidad; V00 debe cerrar el deslinde de los paquetes WBS.">
- <Tabular headers={['Solicitud A','Solicitud B','Relación','Agentes','Situación','Sustento / resolución']}>
- {(snap.overlaps||[]).filter(o=>rows.some(r=>String(r.id)===String(o.request_a)||String(r.id)===String(o.request_b))).map((o,i)=><tr key={i}><td><button className="ai-link" onClick={()=>onOpen(o.code_a)}>{o.code_a}</button></td><td><button className="ai-link" onClick={()=>onOpen(o.code_b)}>{o.code_b}</button></td><td>{o.relation_types}</td><td>{o.agent_a} / {o.agent_b}</td><td><Chip tone={o.status==='PENDIENTE_WBS'?'conditional':'yes'}>{o.status}</Chip></td><td>{o.resolution_basis}</td></tr>)}</Tabular>
+ <Block title="49 relaciones de solapamiento V00" subtitle="Los descuentos solo se reconocen cuando están cuantificados y verificados por V00; una coincidencia no constituye duplicación de horas.">
+ <Tabular headers={['Solicitud A','Solicitud B','Tipo','Estado / deslinde','Propietario','Descuento demostrado','Fundamento / condiciones']}>
+ {selected.map((o,i)=><tr key={i}>
+  <td><button className="ai-link" onClick={()=>onOpen(o.code_a)}>{o.code_a}</button></td>
+  <td><button className="ai-link" onClick={()=>onOpen(o.code_b)}>{o.code_b}</button></td>
+  <td>{o.tipo||o.relation_types}</td>
+  <td><Chip>{o.dictamen||o.status}</Chip><small>{o.tipo_deslinde||''}</small></td>
+  <td>{o.propietario_componente||'Sin asignación'}</td>
+  <td className="ai-num">{fmtHours(o.descuento_demostrado)}</td>
+  <td className="ai-long">{o.resolution_basis}<small>{o.condiciones||''}</small><small>{o.fuente_version||''}</small></td>
+ </tr>)}</Tabular>
  </Block>
- <Block title="Componentes compartidos" subtitle="El costo de construcción corresponde a un solo propietario; los consumidores solo imputan adaptación adicional.">
- <Tabular headers={['Clave','Responsable único','Estado','Descripción','Solicitudes relacionadas']}>
- {(snap.components||[]).map(c=><tr key={c.component_key}><td><b>{c.component_key}</b></td><td>{c.owner_agent}</td><td>{c.status}</td><td className="ai-long">{c.description}</td><td>{(c.dependencies||[]).map(code=><button key={code} className="ai-link" onClick={()=>onOpen(code)}>{code}</button>)}</td></tr>)}</Tabular>
+ <Block title="Componentes reutilizables" subtitle="La propiedad y sus consumidores se presentan sin sumar dos veces el costo de construcción.">
+ <Tabular headers={['Componente','Agente propietario','Estado','Descripción','Solicitudes']}>
+ {(snap.components||[]).map(c=><tr key={c.component_key}>
+  <td><b>{c.component_key}</b></td><td>{c.owner_agent}</td><td>{c.status}</td>
+  <td className="ai-long">{c.description}</td>
+  <td>{(c.dependencies||[]).map(code=><button className="ai-link" key={code} onClick={()=>onOpen(code)}>{code}</button>)}</td>
+ </tr>)}</Tabular>
  </Block></div>;
 }
 function RequestDetail({code,onClose,onSdo}){
