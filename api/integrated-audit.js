@@ -10,7 +10,7 @@ const json = (res, status, body) => res.status(status).json(body);
 
 export async function loadAuditSnapshot(sql) {
   // Una fila por solicitud. Relaciones N:M se agregan como arreglos, no como JOIN multiplicador.
-  const [requests, gaps, agents, overlaps, components, exclusionReviews, sdo] = await Promise.all([
+  const [requests, gaps, agents, legacyOverlaps, components, exclusionReviews, sdo, finalRows, finalGerencial, r48Scope, r48Resolutions, overlapV00] = await Promise.all([
     sql`
       SELECT r.id, r.source_code AS code, r.batch_code AS batch, r.source_sheet,
         r.source_row, r.area, r.request_text AS description, r.created_at AS source_date,
@@ -73,15 +73,80 @@ export async function loadAuditSnapshot(sql) {
     sql`SELECT component_key,description,owner_agent,status,dependencies
        FROM ejenp_estimacion_v08.shared_components ORDER BY component_key`,
     sql`SELECT request_id,source_code,category,technical_reason FROM ejenp_estimacion_v08.exclusions_zero ORDER BY request_id`,
-    sql`SELECT code,description,verification_status FROM ejenp_requerimientos_sdo.sdo_requirements ORDER BY code`
+    sql`SELECT code,description,verification_status FROM ejenp_requerimientos_sdo.sdo_requirements ORDER BY code`,
+    sql`SELECT request_id,code,decision_tecnica_final,es_novedad_acreditada,version_cierre_tecnico,
+      fundamento_tecnico_final,fuentes_tecnicas_finales,clasificacion_contractual_final,fuente_decision,cierre_contractual,
+      requerimiento_maestro,requisitos_sdo,brechas_relacionadas,funcion_originalmente_exigible,
+      ampliacion_funcional_analizada,responsable_contractual_funcional,
+      motivo_exclusion_y_recomendacion,qa_resultado,revision_secundaria,
+      solapamientos_pendientes,solapamientos_casos,condiciones_pendientes,
+      horas_optimistas,horas_mas_probables,horas_pert_brutas,horas_pesimistas,
+      horas_optimistas_admitidas,horas_mas_probables_admitidas,horas_pert_admitidas,
+      horas_pesimistas_admitidas,horas_no_incluidas,horas_excluidas_contractuales,
+      horas_descuento_duplicidad_demostrada,metodo_cierre,actividades_wbs,agente_estimador
+      FROM ejenp_estimacion_v08.v00_final_novedad_318_v9 ORDER BY code`,
+    sql`SELECT * FROM ejenp_estimacion_v08.v00_novedad_gerencial_v9`,
+    sql`SELECT source_code,final_decision,target_system,sdo_codes,sdo_functional_equivalence,
+       eje_reformulation,technical_viability,contractual_rationale,canonical_request,
+       accountable_party,incremental_hours,approval_status,decided_at
+       FROM ejenp_estimacion_v08.v00_r48_final_scope_v4 ORDER BY source_code`,
+    sql`SELECT source_code,previous_status,decision,contractual_owner,target_system,
+       sdo_codes,contractual_function,scope_difference,eje_solution,technical_viability,
+       pending_requirements,basis,master_request,incremental_hours,qa_source,
+       decided_at FROM ejenp_estimacion_v08.v00_r48_resolutions_v5 ORDER BY source_code`,
+    sql`SELECT tipo,code_a,code_b,dictamen,tipo_deslinde,propietario_componente,
+      pert_a,pert_b,excluido_contractual_a,excluido_contractual_b,
+      descuento_duplicidad_demostrada,fundamento,condiciones,version_decision,status_operativo
+      FROM ejenp_estimacion_v08.v00_overlap_dashboard_49_v7 ORDER BY code_a,code_b`
   ]);
-  // La revisión paralela R48 no dispone todavía de un registro específico consultable.
-  // Se expone la decisión V2 vigente y se distingue la inexistencia de una resolución R48.
+  // La única clasificación ejecutiva vigente procede de V00 V9.
+  if (requests.length!==318 || finalRows.length!==318 ||
+      new Set(finalRows.map(r=>r.code)).size!==318) {
+    throw new Error('Las matrices original y V00 V9 no son reconciliables (318 códigos únicos)');
+  }
+  const byCode=new Map(finalRows.map(x=>[x.code,x]));
+  const reconciled=requests.map(r=>{
+    const c=byCode.get(r.code);
+    if(!c || String(c.request_id)!==String(r.id)) throw new Error('Cruce inconsistente V00 V9: '+r.code);
+    return {...r,...c,
+      id:r.id, code:r.code,description:r.description,area:r.area,
+      // Se conserva la V2 histórica como dato, nunca como decisión vigente.
+      final_decision:c.decision_tecnica_final,final_new:c.es_novedad_acreditada===true,
+      final_o:c.horas_optimistas_admitidas,final_m:c.horas_mas_probables_admitidas,
+      final_pert:c.horas_pert_admitidas,final_p:c.horas_pesimistas_admitidas,
+      final_excluded_hours:c.horas_no_incluidas,final_reason:c.fundamento_tecnico_final,
+      final_sources:c.fuentes_tecnicas_finales,final_version:c.version_cierre_tecnico,
+      final_master:c.requerimiento_maestro,final_system:c.responsable_contractual_funcional,
+    };
+  });
+  const versions=[...new Set(finalRows.map(x=>x.version_cierre_tecnico))];
+  if(versions.length!==1) throw new Error('Versiones V00 heterogéneas en el mismo corte');
+  const newRows=reconciled.filter(r=>r.final_new);
+  const finalSum=newRows.reduce((total,r)=>total+Number(r.final_pert||0),0);
+  const gerencial=finalGerencial[0];
+  if(!gerencial ||
+     Number(gerencial.universo_318)!==reconciled.length ||
+     Number(gerencial.novedades_eje)!==newRows.length ||
+     Math.abs(Number(gerencial.horas_pert)-finalSum)>0.02)
+    throw new Error('Resumen V00 V9 y matriz V00 V9 no concilian');
+  const byId=new Map(reconciled.map(r=>[String(r.id),r.code]));
+  const overlaps=overlapV00.map((x,i)=>({
+    ...x,request_a:reconciled.find(r=>r.code===x.code_a)?.id||null,
+    request_b:reconciled.find(r=>r.code===x.code_b)?.id||null,
+    relation_types:x.tipo||x.tipo_deslinde,agent_a:'V00',agent_b:x.propietario_componente,
+    status:x.status_operativo||x.dictamen,resolution_basis:x.fundamento,
+    descuento_demostrado:x.descuento_duplicidad_demostrada,
+    fuente_version:x.version_decision
+  }));
   return {
     access:'read_only_audit', generatedAt:new Date().toISOString(),
-    source:'Neon: ejenp_auditoria_318 + ejenp_v14_brechas + ejenp_estimacion_v08 + ejenp_requerimientos_sdo',
-    r48:{registryStatus:'not_registered',notice:'No se encontró un registro propio y verificable de decisiones R48. Se muestra la clasificación V2 y la revisión R48 permanece pendiente.'},
-    requests,gaps,agents,overlaps,components,exclusions:exclusionReviews,sdo
+    source:'Neon · cierre técnico final V00 V9 / auditoría 318 / Laboral / SDO',
+    sourceVersion:versions[0], managerial:gerencial,
+    r48:{registryStatus:'recorded',scope:r48Scope,resolutions:r48Resolutions,
+      notice:'Decisiones R48 vigentes consultadas. Se conservan versiones y criterios anteriores sin duplicar horas.'},
+    requests:reconciled,gaps,agents,overlaps,components,exclusions:exclusionReviews,sdo,
+    historical:{estimateCount:reconciled.filter(x=>x.estimate_id).length,
+      overlapGuardCount:legacyOverlaps.length}
   };
 }
 
