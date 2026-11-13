@@ -32,8 +32,10 @@ async function verify(){
  assert.equal(d.byCode.length,122);
  const c=new Map(d.categories.map(x=>[x.categoria_resumen_v13,x]));
  for(const [key,expected] of Object.entries({
-  INCREMENTAL_EVALUACION_USUARIO:122,ALCANCE_SDO:94,ALCANCE_BRECHA:2,
-  DUPLICADO:8,EXTERNO_O_REFORMULACION:86,CONFIGURACIONES_Y_AJUSTES:6
+  INCREMENTAL_EVALUACION_USUARIO:m.incrementales_evaluacion_usuario,
+  ALCANCE_SDO:m.sdo,ALCANCE_BRECHA:m.brechas,DUPLICADO:m.duplicados,
+  EXTERNO_O_REFORMULACION:m.sistemas_externos_y_reformulacion,
+  CONFIGURACIONES_Y_AJUSTES:m.configuraciones_y_ajustes
  }))assert.equal(c.get(key)?.solicitudes,expected,'Clasificación '+key);
  assert.equal(c.get('CONFIGURACIONES_Y_AJUSTES').categoria_visible_v13,'Configuraciones y ajustes');
  const proposals=d.rows.filter(r=>r.categoria_resumen_v13==='INCREMENTAL_EVALUACION_USUARIO');
@@ -42,9 +44,9 @@ async function verify(){
  assert.ok(d.rows.filter(r=>r.categoria_resumen_v13!=='INCREMENTAL_EVALUACION_USUARIO')
   .every(r=>n(r.horas_pert_incrementales_propuestas)===0),'Horas indebidamente asignadas');
  const external=d.rows.filter(r=>r.categoria_resumen_v13==='EXTERNO_O_REFORMULACION');
- assert.equal(external.length,86);
- assert.equal(external.filter(x=>/Cambio directo en sistema externo/i.test(x.subcategoria_funcional_v13||'')).length,52);
- assert.equal(external.filter(x=>/Reformular como funcionalidad EJE/i.test(x.subcategoria_funcional_v13||'')).length,34);
+ assert.equal(external.length,Number(m.sistemas_externos_y_reformulacion));
+ assert.equal(external.filter(x=>/Cambio directo en sistema externo/i.test(x.subcategoria_funcional_v13||'')).length,Number(m.modificacion_sistema_externo));
+ assert.equal(external.filter(x=>/Reformular como funcionalidad EJE/i.test(x.subcategoria_funcional_v13||'')).length,Number(m.reformular_para_eje));
  assert.ok(Math.abs(sum(d.phases,'horas')-13547.86)<.015);
  assert.equal(sum(d.phases,'actividades'),635);
  const w=await fetchData('/api/report-v13?view=wbs');
