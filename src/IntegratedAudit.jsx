@@ -44,12 +44,14 @@ function FilterBar({rows,filters,setFilters,clear}) {
   <SelectField label="Agente V08" value={filters.agent} values={options('v08_agent')} onChange={v=>update('agent',v)}/>
   <SelectField label="Estado V08" value={filters.status} values={options('estimate_status')} onChange={v=>update('status',v)}/>
   <SelectField label="Confianza" value={filters.confidence} values={options('estimate_confidence')} onChange={v=>update('confidence',v)}/>
+  <SelectField label="QA técnico" value={filters.qa} values={options('qa_outcome')} onChange={v=>update('qa',v)}/>
   <SelectField label="Lote" value={filters.batch} values={options('batch')} onChange={v=>update('batch',v)}/>
   <label>PERT mínimo (h)<input type="number" min="0" value={filters.minHours} onChange={e=>update('minHours',e.target.value)}/></label>
   <label>PERT máximo (h)<input type="number" min="0" value={filters.maxHours} onChange={e=>update('maxHours',e.target.value)}/></label>
   <label className="ai-check"><input type="checkbox" checked={filters.onlySdo} onChange={e=>update('onlySdo',e.target.checked)}/> Con SDO</label>
   <label className="ai-check"><input type="checkbox" checked={filters.onlyGap} onChange={e=>update('onlyGap',e.target.checked)}/> Con brecha</label>
   <label className="ai-check"><input type="checkbox" checked={filters.onlyEstimated} onChange={e=>update('onlyEstimated',e.target.checked)}/> Estimados</label>
+  <label className="ai-check"><input type="checkbox" checked={filters.onlyExcluded} onChange={e=>update('onlyExcluded',e.target.checked)}/> Excluidos</label>
   <button className="ai-btn secondary" onClick={clear}>Restablecer filtros</button>
  </div>;
 }
@@ -246,7 +248,7 @@ function RequestDetail({code,onClose,onSdo}){
 }
 export default function IntegratedAudit({view='resumen',onNavigate=()=>{}}){
  const [state,setState]=useState({loading:true,snapshot:null,error:''});
- const [filters,setFilters]=useState(initialFilters),[page,setPage]=useState(1),[detail,setDetail]=useState(()=>new URLSearchParams(window.location.search).get('req'));
+ const [filters,setFilters]=useState(initialFilters),[page,setPage]=useState(1),[orderBy,setOrderBy]=useState('code'),[ascending,setAscending]=useState(true),[detail,setDetail]=useState(()=>new URLSearchParams(window.location.search).get('req'));
  const pageSize=25;
  const refresh=useCallback(async(force=false)=>{setState(p=>({...p,loading:true,error:''}));try{const snapshot=await fetchSnapshot(force);setState({loading:false,snapshot,error:''})}catch(e){setState(p=>({...p,loading:false,error:e.message||'Error de conexión'}))}},[]);
  useEffect(()=>{refresh(false)},[refresh]);
@@ -255,7 +257,10 @@ export default function IntegratedAudit({view='resumen',onNavigate=()=>{}}){
  const openDetail=code=>{setDetail(code);const url=new URL(window.location.href);url.searchParams.set('req',code);window.history.pushState({req:code},'',url.pathname+url.search+url.hash);window.scrollTo({top:0,behavior:'smooth'})};
  const closeDetail=()=>{setDetail(null);const url=new URL(window.location.href);url.searchParams.delete('req');window.history.pushState({},'',url.pathname+url.search+url.hash)};
  const snap=state.snapshot,all=snap?.requests||[],filtered=useMemo(()=>filteredRequests(all,filters),[all,filters]);
- const matched=useMemo(()=>view==='obligaciones318'?filtered.filter(r=>r.eligibility==='EXCLUIDO'):filtered,[view,filtered]);
+ const matched=useMemo(()=>{
+   const source=view==='obligaciones318'?filtered.filter(r=>r.eligibility==='EXCLUIDO'):filtered;
+   return [...source].sort((a,b)=>{const x=orderBy==='hours'?Number(a.pert_expected||0):String(a[orderBy]||'');const y=orderBy==='hours'?Number(b.pert_expected||0):String(b[orderBy]||'');return (ascending?1:-1)*(typeof x==='number'?x-y:x.localeCompare(y,'es'))});
+ },[view,filtered,orderBy,ascending]);
  const metrics=useMemo(()=>summarize(filtered,snap?.overlaps||[]),[filtered,snap]);
  const visible=matched.slice((page-1)*pageSize,page*pageSize);
  const setView=(key)=>{closeDetail();onNavigate(key)};
@@ -273,7 +278,7 @@ export default function IntegratedAudit({view='resumen',onNavigate=()=>{}}){
  <div className="ai-toolbar"><span><Filter size={14}/>{fmt(filtered.length)} de {fmt(all.length)} solicitudes {view==='brechasLaboral'?'· '+fmt(snap.gaps.length)+' registros Laboral':''}</span>
  <div><button className="ai-btn secondary" onClick={()=>exportAuditXlsx(filtered)}><Download size={15}/> Excel 318</button><button className="ai-btn primary" onClick={()=>exportAuditPptx(snap,filtered)}><BarChart3 size={15}/> PowerPoint gerencial</button></div></div>
  {view==='resumen'&&<Overview rows={filtered} snapshot={snap} m={metrics} onOpen={openDetail} onSwitch={setView}/>}
- {view==='matriz318'&&<><Matrix rows={visible} onOpen={openDetail}/><Pagination page={page} setPage={setPage} total={matched.length} pageSize={pageSize}/></>}
+ {view==='matriz318'&&<><div className="ai-toolbar"><span>Orden de la matriz</span><div><select className="ai-order" value={orderBy} onChange={e=>setOrderBy(e.target.value)}><option value="code">Código</option><option value="area">Área</option><option value="eligibility">Elegibilidad</option><option value="v08_agent">Agente V08</option><option value="estimate_status">Estado V08</option><option value="hours">Horas PERT</option></select><button className="ai-btn secondary" onClick={()=>setAscending(p=>!p)}>{ascending?'Ascendente':'Descendente'}</button></div></div><Matrix rows={visible} onOpen={openDetail}/><Pagination page={page} setPage={setPage} total={matched.length} pageSize={pageSize}/></>}
  {view==='obligaciones318'&&<Obligations rows={filtered} sdoCatalog={snap.sdo||[]} onOpen={openDetail} onSdo={code=>onNavigate('sdo',code,{kind:'sdo',id:code})}/>}
  {view==='brechasLaboral'&&<GapTable gaps={snap.gaps||[]} rows={all} onOpen={openDetail} onSdo={code=>onNavigate('sdo',code,{kind:'sdo',id:code})}/>}
  {view==='avancev08'&&<AgentProgress snap={snap} rows={all} onOpen={openDetail}/>}
