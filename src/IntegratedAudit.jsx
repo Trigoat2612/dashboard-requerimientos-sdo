@@ -60,66 +60,90 @@ function Pagination({page,total,pageSize,setPage}) {
  const pages=Math.max(1,Math.ceil(total/pageSize));
  return <div className="ai-pagination"><span>{fmt(total)} registros · Página {page} de {pages}</span><div><button disabled={page<=1} onClick={()=>setPage(Math.max(1,page-1))}><ChevronLeft size={16}/> Anterior</button><button disabled={page>=pages} onClick={()=>setPage(Math.min(pages,page+1))}>Siguiente <ChevronRight size={16}/></button></div></div>;
 }
+
 function Overview({rows,snapshot,m,onOpen,onSwitch}){
- const counts=Object.entries(rows.reduce((a,r)=>(a[r.eligibility||'Sin clasificación']=(a[r.eligibility||'Sin clasificación']||0)+1,a),{})).sort((a,b)=>b[1]-a[1]);
- const ex=Object.entries(rows.filter(x=>x.eligibility==='EXCLUIDO').reduce((a,r)=>(a[r.v07_category||'Sin causa']=(a[r.v07_category||'Sin causa']||0)+1,a),{})).sort((a,b)=>b[1]-a[1]);
- const agents=(snapshot.agents||[]).map(a=>({...a,items:rows.filter(r=>r.v08_agent===a.agent_id)}));
+ const divisions=Object.entries(m.classification).sort((a,b)=>b[1]-a[1]);
+ const newRows=rows.filter(r=>r.final_new).sort((a,b)=>Number(b.final_pert||0)-Number(a.final_pert||0));
+ const byArea=Object.entries(newRows.reduce((a,r)=>(a[r.area||'Sin especialidad']=(a[r.area||'Sin especialidad']||0)+Number(r.final_pert||0),a),{})).sort((a,b)=>b[1]-a[1]);
+ const perAgent=(snapshot.agents||[]).map(a=>({agent:a.agent_id,total:rows.filter(r=>r.v08_agent===a.agent_id&&r.final_new).reduce((n,r)=>n+Number(r.final_pert||0),0)}));
+ const max=Math.max(1,...byArea.map(x=>x[1]),...perAgent.map(x=>x.total));
  return <div className="ai-flow">
+ <div className="ai-callout"><CheckCircle2 size={21}/><span><b>Cierre técnico definitivo: {snapshot.sourceVersion}</b>. Las cifras reconocidas como nuevas se calculan sobre las 318 decisiones individuales V00 V9. Las WBS preliminares excluidas permanecen en el historial, no en la bolsa incremental.</span></div>
  <div className="ai-metrics">
-  <Metric label="Solicitudes analizadas" value={fmt(m.total)} help="Una fila por código original"/>
-  <Metric label="Obligación SDO vinculada" value={fmt(m.sdoCovered)} help="Exclusiones con SDO identificado; cumplimiento no inferido"/>
-  <Metric label="Brecha contractual vinculada" value={fmt(m.gapCovered)} help="Exclusiones con brecha identificada"/>
-  <Metric label="Incrementales firmes" value={fmt(m.firm)}/>
-  <Metric label="Estimables condicionales" value={fmt(m.conditional)} flag="caution"/>
-  <Metric label="Excluidos" value={fmt(m.excluded)} help="Sin esfuerzo incremental propio"/>
-  <Metric label="Estimaciones WBS cerradas" value={fmt(m.estimated)}/>
-  <Metric label="Pendientes de estimar" value={fmt(m.pending)}/>
-  <Metric label="Horas firmes PERT" value={fmtHours(m.firmHours.pert)} flag="primary"/>
-  <Metric label="Horas condicionadas PERT" value={fmtHours(m.conditionalHours.pert)} flag="caution"/>
-  <Metric label="QA técnico pendiente" value={fmt(m.pendingQA)} help={m.qaHours===null?'Horas QA: aún sin validación':fmtHours(m.qaHours)+' aceptadas'}/>
-  <Metric label="Solapamientos sin resolver" value={fmt(m.overlaps)} help="Los totales brutos pueden requerir conciliación"/>
+  <Metric label="Requisitos SDO" value={fmt(snapshot.sdo?.length)} help="Universo contractual"/>
+  <Metric label="Brechas Laboral" value={fmt(snapshot.gaps?.length)} help="Registros de análisis"/>
+  <Metric label="Solicitudes evaluadas" value={fmt(m.total)} help="Una decisión vigente por código"/>
+  <Metric label="Funcionalidades nuevas EJE" value={fmt(m.newCount)} flag="primary" help="Novedad técnica acreditada"/>
+  <Metric label="Alcance SDO existente" value={fmt(m.sdoCovered)} help="No se suma a bolsa"/>
+  <Metric label="Alcance brecha original" value={fmt(m.gapCovered)} help="No se suma a bolsa"/>
+  <Metric label="Cambios en sistemas externos" value={fmt(m.external)} help="Reformular si se desea intervenir el EJE"/>
+  <Metric label="Novedad no acreditada" value={fmt(m.notAccredited)} help="No cargar a bolsa sin sustento"/>
+  <Metric label="Configuración y ajustes" value={fmt(m.configuration)} help="No incrementales"/>
+  <Metric label="Duplicados" value={fmt(m.duplicates)} help="Esfuerzo una sola vez"/>
+  <Metric label="Horas finales PERT EJE" value={fmtHours(m.finalHours.pert)} flag="primary" help="Sólo nuevas funcionalidades acreditadas"/>
+  <Metric label="Horas preliminares no incluidas" value={fmtHours(m.notIncludedHours)} flag="caution" help="Referencia histórica, no financiar"/>
  </div>
  <div className="ai-columns">
-  <Block title="Elegibilidad actual" subtitle="Distribución de solicitudes filtradas; revisión V2 vigente">
-   {counts.map(([n,v])=><Bar key={n} name={labels[n]||n} value={v} max={m.total}/>)}
+  <Block title="Clasificación técnica final" subtitle="Exactamente la clasificación V00 V9, no la elegibilidad histórica V2">
+   {divisions.map(([k,v])=><Bar key={k} name={labels[k]||k} value={v} max={m.total}/>)}
   </Block>
-  <Block title="Escenarios de esfuerzo" subtitle="No mezclar esfuerzo firme y condicionado; horas-persona">
+  <Block title="Escenarios WBS / PERT reconocidos" subtitle="Horas-persona de las nuevas funcionalidades EJE; escenarios propios de la misma muestra">
    <div className="ai-scenarios">
-   <h4>Incremental firme</h4>{[['Optimista','optimistic'],['Más probable','mostLikely'],['Esperado PERT','pert'],['Pesimista','pessimistic'],['Contingencia aparte','contingency']].map(([k,f])=><div key={k}><span>{k}</span><b>{fmtHours(m.firmHours[f])}</b></div>)}
-   <h4>Condicional, separado</h4>{[['Optimista','optimistic'],['Más probable','mostLikely'],['Esperado PERT','pert'],['Pesimista','pessimistic']].map(([k,f])=><div key={k}><span>{k}</span><b>{fmtHours(m.conditionalHours[f])}</b></div>)}
-   <h4>Autorización</h4><div><span>Horas técnicamente aceptadas</span><b>{fmtHours(m.qaHours)}</b></div><div><span>Horas contractualmente aprobadas</span><b>Sin aprobación verificada</b></div>
+    {Object.entries({Optimista:m.finalHours.optimistic,'Más probable':m.finalHours.mostLikely,'Esperada PERT':m.finalHours.pert,Pesimista:m.finalHours.pessimistic})
+     .map(([k,v])=><div key={k}><span>{k}</span><b>{fmtHours(v)}</b></div>)}
+    <h4>Conciliación histórica</h4>
+    <div><span>PERT técnico bruto antes del cierre</span><b>{fmtHours(m.referenceBruteHours)}</b></div>
+    <div><span>PERT no admitido para nuevas funciones</span><b>{fmtHours(m.notIncludedHours)}</b></div>
+    <div><span>Solicitudes con WBS histórica</span><b>{fmt(m.technicalHistorical)}</b></div>
+    <div><span>Actividades WBS finales admitidas</span><b>{fmt(m.wbsAccepted)}</b></div>
    </div>
   </Block>
-  <Block title="Exclusiones por causa" subtitle="No toda exclusión constituye obligación contractual de Softplan">{ex.map(([n,v])=><Bar key={n} name={labels[n]||n} value={v} max={Math.max(1,m.excluded)}/>)}</Block>
-  <Block title="Avance de las ventanas V08" subtitle="Estimaciones cerradas frente a asignaciones en la selección">
-   {(snapshot.agents||[]).map(a=><Bar key={a.agent_id} name={a.agent_id+' · '+a.focus} value={rows.filter(r=>r.v08_agent===a.agent_id&&isEstimated(r)).length} max={Math.max(1,rows.filter(r=>r.v08_agent===a.agent_id).length)} label={rows.filter(r=>r.v08_agent===a.agent_id&&isEstimated(r)).length+' / '+rows.filter(r=>r.v08_agent===a.agent_id).length}/>)}
+  <Block title="Horas admitidas por área" subtitle="Sólo las solicitudes NUEVO_EJE, sin sumar intervenciones a satélites">
+   {byArea.map(([k,v])=><Bar key={k} name={k} value={v} max={max} label={fmtHours(v)}/>)}
+  </Block>
+  <Block title="Riesgos y exclusiones" subtitle="Razonamiento técnico V00 V9 y resolución de conflictos">
+   <div className="ai-scenarios">
+    <div><span>Reformulación pendiente para EJE</span><b>{fmt(m.reformulation)}</b></div>
+    <div><span>Solapamientos identificados</span><b>{fmt(m.overlaps)}</b></div>
+    <div><span>Revisiones R48 registradas</span><b>{fmt((snapshot.r48?.scope||[]).length+(snapshot.r48?.resolutions||[]).length)}</b></div>
+    <div><span>Novedad no acreditada</span><b>{fmt(m.notAccredited)}</b></div>
+   </div>
+   <p className="ai-note">Una coincidencia con SDO no prueba cumplimiento funcional; una WBS preliminar tampoco acredita novedad técnica.</p>
   </Block>
  </div>
- <Block title="Lectura ejecutiva" subtitle="Hechos, interpretaciones y decisiones pendientes sin confundirlas">
+ <Block title="Seis funcionalidades nuevas acreditadas" subtitle="Detalle técnico revisable, con horas realmente admitidas por V00">
+  <Tabular headers={['Solicitud','Descripción','Área','PERT final','Corte','Abrir ficha']}>
+   {newRows.map(r=><tr key={r.code}><td><b>{r.code}</b></td><td className="ai-long">{r.description}</td><td>{r.area}</td><td className="ai-num"><b>{fmtHours(r.final_pert)}</b></td><td><small>{r.final_version}</small></td><td><button className="ai-btn small" onClick={()=>onOpen(r.code)}>WBS <ChevronRight size={14}/></button></td></tr>)}
+  </Tabular>
+ </Block>
+ <Block title="Conclusiones para dirección" subtitle="Distingue hechos verificados, interpretación y medidas necesarias">
   <div className="ai-four">
-   <div><b>Hechos verificados</b><p>{m.total} solicitudes en esta selección; {m.estimated} con actividades WBS cerradas. Se registran {m.overlaps} pares de solapamiento pendiente o no resuelto.</p></div>
-   <div><b>Conclusión técnica</b><p>La suma PERT firme es {fmtHours(m.firmHours.pert)} y la condicional {fmtHours(m.conditionalHours.pert)}. Son propuestas, no horas aprobadas.</p></div>
-   <div><b>Condiciones pendientes</b><p>{m.pendingQA} estimaciones carecen de QA técnico registrado. Las clasificaciones contractuales no demuestran por sí solas funcionamiento.</p></div>
-   <div><b>Recomendación</b><p>V00 debe conciliar solapamientos y QA. GSJ/GTI deben verificar capacidades originales y supuestos; PEJENP determina la procedencia contractual.</p></div>
+   <div><b>Hechos</b><p>{m.newCount} de {m.total} solicitudes tienen novedad EJE acreditada. Sus {fmt(m.wbsAccepted)} actividades suman {fmtHours(m.finalHours.pert)} PERT.</p></div>
+   <div><b>Alcance original</b><p>{m.sdoCovered} están clasificadas en SDO original y {m.gapCovered} en brechas originales. Deben atenderse sin contabilizar nuevos incrementos.</p></div>
+   <div><b>Exclusiones y reformulación</b><p>{m.external} afectan directamente sistemas externos y {m.reformulation} requieren reformulación; no suman horas EJE.</p></div>
+   <div><b>Recomendación técnica</b><p>Implementar exclusivamente deltas EJE sustentados. Mantener separados incumplimientos, defectos, configuraciones, duplicidades y solicitudes sin novedad acreditada.</p></div>
   </div>
  </Block>
- <div className="ai-actions"><button className="ai-btn primary" onClick={()=>onSwitch('matriz318')}>Examinar matriz integral <ChevronRight size={16}/></button><button className="ai-btn secondary" onClick={()=>onSwitch('avancev08')}>Seguimiento por agente</button></div>
+ <div className="ai-actions"><button className="ai-btn primary" onClick={()=>onSwitch('matriz318')}>Ver las 318 decisiones <ChevronRight size={16}/></button><button className="ai-btn secondary" onClick={()=>onSwitch('solapamientosv08')}>Solapamientos y duplicidades</button></div>
  </div>;
 }
 function Matrix({rows,onOpen}){
- return <Tabular headers={['Código / lote','Solicitud original','Área','Evaluación V07','Elegibilidad V2','Obligación SDO / brecha','Alcance incremental','Agente / estado V08','Método','O (h)','M (h)','PERT (h)','P (h)','QA','Detalle']}>
+ return <Tabular headers={['Solicitud','Descripción original','Área','Decisión técnica final V00 V9','SDO / brecha','Originalmente exigible','Incremento y fundamento','Sistema / responsable','Agente y estimación histórica','O final','M final','PERT final','P final','Horas no incluidas','Método','QA / revisión','Detalle']}>
  {rows.map(r=><tr key={r.code}>
- <td><strong>{r.code}</strong><small>{r.batch} · fila {r.source_row}</small></td>
- <td className="ai-long">{r.description}</td><td>{r.area}</td>
- <td><Chip>{labels[r.v07_category]||alt(r.v07_category)}</Chip><small>{r.qa_v07||'Sin QA'}</small></td>
- <td><Chip tone={r.eligibility==='INCREMENTAL'?'yes':r.eligibility==='CONDICIONAL'?'conditional':'no'}>{labels[r.eligibility]||alt(r.eligibility)}</Chip></td>
- <td><small>SDO: {(r.sdo_links||[]).map(s=>s.code).join(', ')||'Sin vínculo'}</small><small>Brecha: {(r.gap_links||[]).map(s=>s.id).join(', ')||'Sin vínculo'}</small></td>
- <td className="ai-long">{alt(r.incremental_delta,r.eligibility==='EXCLUIDO'?alt(r.exclusion_zero_reason,r.exclusion_reason):'Pendiente de deslinde')}</td>
- <td>{alt(r.v08_agent)}<small>{r.estimate_status||'Sin unidad'}</small></td>
- <td>{isEstimated(r)?'WBS + 3 puntos + PERT':'Sin estimación'}</td>
- {['optimistic','most_likely','pert_expected','pessimistic'].map(k=><td key={k} className="ai-num">{isEstimated(r)?fmt2(r[k]):r.eligibility==='EXCLUIDO'?'0':'Pendiente'}</td>)}
- <td>{alt(r.qa_outcome,'Pendiente QA')}</td>
- <td><button className="ai-btn small" onClick={()=>onOpen(r.code)}>Ver ficha <ChevronRight size={14}/></button></td>
+  <td><b>{r.code}</b><small>{r.batch} · fila {r.source_row}</small></td>
+  <td className="ai-long">{r.description}</td>
+  <td>{r.area}</td>
+  <td><Chip tone={r.final_new?'yes':r.final_decision==='NOVEDAD_NO_ACREDITADA'?'conditional':'no'}>{labels[r.final_decision]||r.final_decision}</Chip><small>{r.final_version}</small></td>
+  <td><small>SDO: {r.requisitos_sdo||(r.sdo_links||[]).map(l=>l.code).join(', ')||'Sin registro'}</small><small>Brecha: {r.brechas_relacionadas||(r.gap_links||[]).map(l=>l.id).join(', ')||'Sin registro'}</small></td>
+  <td className="ai-long">{r.funcion_originalmente_exigible||'No se identificó obligación específica'}</td>
+  <td className="ai-long">{r.final_reason||r.motivo_exclusion_y_recomendacion||'Ver detalle'}</td>
+  <td>{r.final_system||'Sin responsable definido'}<small>{r.final_master?'Maestro: '+r.final_master:''}</small></td>
+  <td>{r.agente_estimador||r.v08_agent||'No asignado'}<small>{r.estimate_id?'WBS preliminar histórica':'Sin WBS preliminar'}</small></td>
+  {['final_o','final_m','final_pert','final_p'].map(k=><td key={k} className="ai-num">{fmt2(r[k])}</td>)}
+  <td className="ai-num">{fmt2(r.final_excluded_hours)}</td>
+  <td>{r.final_new?'WBS / 3 puntos / PERT':'No aplica bolsa'}</td>
+  <td>{r.qa_resultado||'No consignado'}<small>{r.revision_secundaria||''}</small></td>
+  <td><button className="ai-btn small" onClick={()=>onOpen(r.code)}>Ver sustento <ChevronRight size={14}/></button></td>
  </tr>)}</Tabular>;
 }
 function Obligations({rows,onOpen,onSdo,sdoCatalog=[]}){
