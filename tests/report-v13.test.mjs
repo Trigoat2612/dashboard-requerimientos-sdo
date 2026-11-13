@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {reconcileV13,loadSnapshot,loadDetail} from '../api/report-v13.js';
+import {reconcileV13,completeCategories,loadSnapshot,loadDetail} from '../api/report-v13.js';
 import {filterReport,summarizeReport,INCREMENTAL} from '../src/report-v13-model.js';
 import {buildV13Xlsx,buildV13Pptx} from '../src/report-v13-export.js';
 
@@ -49,6 +49,23 @@ test('318 solicitudes, seis categorías, 52+34 externos, 122 propuestas y 635 WB
  assert.equal(result.valid,true);assert.equal(result.requests,318);assert.equal(result.proposals,122);
  assert.equal(result.activities,635);assert.equal(result.pert,13547.86);
 });
+
+test('el corte actual con cero brechas mantiene seis categorías visibles y las 122 WBS originales',()=>{
+ const f=fixture();
+ const changed=f.rows.filter(r=>r.categoria_resumen_v13==='ALCANCE_BRECHA');
+ assert.equal(changed.length,2);
+ for(const r of changed){r.categoria_resumen_v13='EXTERNO_O_REFORMULACION';
+  r.categoria_visible_v13='Solicitudes sobre sistemas externos o sujetas a reformulación';
+  r.subcategoria_funcional_v13='Reformular como funcionalidad EJE si corresponde, contrastando SDO y brechas'}
+ f.manager.brechas=0;f.manager.sistemas_externos_y_reformulacion=88;f.manager.reformular_para_eje=36;
+ f.categories=f.categories.filter(c=>c.categoria_resumen_v13!=='ALCANCE_BRECHA');
+ f.categories.find(c=>c.categoria_resumen_v13==='EXTERNO_O_REFORMULACION').solicitudes=88;
+ const six=completeCategories(f.categories);
+ assert.equal(six.length,6);
+ assert.equal(six.find(c=>c.categoria_resumen_v13==='ALCANCE_BRECHA').solicitudes,0);
+ assert.equal(reconcileV13({...f,categories:six}).pert,13547.86);
+});
+
 test('inconsistencia en WBS individual impide publicación de indicadores',()=>{
  const f=fixture();f.byCode[0].horas_pert=0;
  assert.throws(()=>reconcileV13(f),/PERT WBS por solicitud/);
