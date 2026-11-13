@@ -42,7 +42,7 @@ jobs:
         run: node scripts/preview-smoke.mjs
 
   production-smoke:
-    name: Verificación HTTP productiva de auditoría integral
+    name: Verificación productiva del informe institucional
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -52,5 +52,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Reconciliar Neon y ficha WBS en producción
-        run: node scripts/audit-production-smoke.mjs
+      - name: Verificar 318 solicitudes, 122 propuestas, 635 WBS y documentos públicos
+        run: node scripts/report-v13-production-smoke.mjs
