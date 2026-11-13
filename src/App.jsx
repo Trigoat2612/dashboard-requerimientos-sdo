@@ -6,7 +6,7 @@ import V09Overview from './V09Overview.jsx';
 import ReportV13 from './ReportV13.jsx';
 import GapExplorer from './GapExplorer.jsx';
 import { toSafeCsv } from './csv-utils.js';
-import {Activity,BookOpen,ClipboardList,FileText,Layers,Calculator,Search,RefreshCw,ExternalLink,ChevronRight,CheckCircle2,AlertCircle,Menu,X,Save,Download,Database,Filter,ShieldCheck,Clock3} from 'lucide-react';
+import {Activity,BarChart3,BookOpen,ClipboardList,FileText,Layers,Calculator,Search,RefreshCw,ExternalLink,ChevronRight,CheckCircle2,AlertCircle,Menu,X,Save,Download,Database,Filter,ShieldCheck,Clock3} from 'lucide-react';
 
 const tabs=[
   {id:'resumen',label:'Resumen gerencial',icon:Activity},
