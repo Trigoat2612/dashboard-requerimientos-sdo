@@ -5,9 +5,9 @@ export const CATEGORIES=[
 ];
 export const asNum=x=>x===null||x===undefined||x===''?null:Number(x);
 export const numeric=x=>Number(x??0)||0;
-export const formatCount=x=>new Intl.NumberFormat('es-PE',{maximumFractionDigits:0}).format(numeric(x));
+export const formatCount=x=>new Intl.NumberFormat('es-ES',{maximumFractionDigits:0}).format(numeric(x));
 export const formatHours=x=>asNum(x)===null||!Number.isFinite(Number(x))?'Sin dato':
- new Intl.NumberFormat('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(x))+' h';
+ new Intl.NumberFormat('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(x))+' h';
 export const label=(snapshot,id)=>snapshot?.categories?.find(c=>c.categoria_resumen_v13===id)?.categoria_visible_v13||id||'Sin clasificación';
 export const isIncremental=r=>r?.categoria_resumen_v13===INCREMENTAL;
 export const isOther=r=>r?.categoria_resumen_v13!==INCREMENTAL;
