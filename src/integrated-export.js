@@ -3,7 +3,7 @@
 import { exportColumns, exportHeaders, summarize, fmtHours, number } from './integrated-model.js';
 
 const enc=new TextEncoder();
-const xml=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&apos;').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,' ');
+export const xml=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&apos;').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,' ');
 const pad=(n,len=2)=>String(n).padStart(len,'0');
 const u16=(a,p,v)=>{a[p]=v&255;a[p+1]=(v>>>8)&255;};
 const u32=(a,p,v)=>{a[p]=v&255;a[p+1]=(v>>>8)&255;a[p+2]=(v>>>16)&255;a[p+3]=(v>>>24)&255;};
@@ -12,7 +12,7 @@ function crc32(bytes) {
  if(!crcTable)crcTable=Array.from({length:256},(_,n)=>{for(let j=0;j<8;j++)n=(n&1)?(0xEDB88320^(n>>>1)):(n>>>1);return n>>>0;});
  let c=0xffffffff;for(let x of bytes)c=crcTable[(c^x)&255]^(c>>>8);return (c^0xffffffff)>>>0;
 }
-function zipEntries(entries) {
+export function zipEntries(entries) {
  const local=[],central=[];let offset=0;
  for(const [name,body] of entries){
   const n=enc.encode(name),b=enc.encode(body),crc=crc32(b);
@@ -24,7 +24,7 @@ function zipEntries(entries) {
  const size=central.reduce((n,c)=>n+c.length,0),end=new Uint8Array(22);u32(end,0,0x06054b50);u16(end,8,entries.length);u16(end,10,entries.length);u32(end,12,size);u32(end,16,offset);
  const parts=[...local,...central,end],out=new Uint8Array(offset+size+end.length);let pos=0;for(const p of parts){out.set(p,pos);pos+=p.length;}return out;
 }
-function download(bytes,name,type){
+export function download(bytes,name,type){
  const blob=new Blob([bytes],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');
  a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
@@ -66,6 +66,24 @@ function slide(title,items,i,total) {
  shape(3,700000,740000,11100000,710000,[title],3000,'173652',true)+content+
  shape(99,720000,6420000,10900000,250000,['Corte '+now()+' · Propuestas técnicas, no horas aprobadas · '+i+' / '+total],1100,'64748B')+
  '</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>';
+}
+// Generador OOXML reutilizable para la presentación institucional consolidada.
+export function buildSlideDeck(pages){
+ const ct='<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/><Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/><Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>'+pages.map((_,i)=>'<Override PartName="/ppt/slides/slide'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>').join('')+'</Types>';
+ const rel=(target,type,id)=>'<Relationship Id="'+id+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/'+type+'" Target="'+target+'"/>';
+ const wrapper=s=>'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+s+'</Relationships>';
+ const entries=[
+ ['[Content_Types].xml',ct],['_rels/.rels',wrapper(rel('ppt/presentation.xml','officeDocument','rId1'))],
+ ['ppt/presentation.xml','<p:presentation xmlns:a="'+aNs+'" xmlns:r="'+rNs+'" xmlns:p="'+pNs+'"><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst><p:sldIdLst>'+pages.map((_,i)=>'<p:sldId id="'+(256+i)+'" r:id="rId'+(i+2)+'"/>').join('')+'</p:sldIdLst><p:sldSz cx="12192000" cy="6858000"/><p:notesSz cx="6858000" cy="9144000"/></p:presentation>'],
+ ['ppt/_rels/presentation.xml.rels',wrapper(rel('slideMasters/slideMaster1.xml','slideMaster','rId1')+pages.map((_,i)=>rel('slides/slide'+(i+1)+'.xml','slide','rId'+(i+2))).join(''))],
+ ['ppt/slideMasters/slideMaster1.xml','<p:sldMaster xmlns:a="'+aNs+'" xmlns:r="'+rNs+'" xmlns:p="'+pNs+'"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld><p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle/><p:bodyStyle/><p:otherStyle/></p:txStyles></p:sldMaster>'],
+ ['ppt/slideMasters/_rels/slideMaster1.xml.rels',wrapper(rel('../slideLayouts/slideLayout1.xml','slideLayout','rId1')+rel('../theme/theme1.xml','theme','rId2'))],
+ ['ppt/slideLayouts/slideLayout1.xml','<p:sldLayout xmlns:a="'+aNs+'" xmlns:r="'+rNs+'" xmlns:p="'+pNs+'" type="blank" preserve="1"><p:cSld name="En blanco"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>'],
+ ['ppt/slideLayouts/_rels/slideLayout1.xml.rels',wrapper(rel('../slideMasters/slideMaster1.xml','slideMaster','rId1'))],
+ ['ppt/theme/theme1.xml','<a:theme xmlns:a="'+aNs+'" name="Institucional V09"><a:themeElements><a:clrScheme name="Azul"><a:dk1><a:srgbClr val="152F4B"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="1E3A5F"/></a:dk2><a:lt2><a:srgbClr val="E9F0F7"/></a:lt2><a:accent1><a:srgbClr val="B68A43"/></a:accent1><a:accent2><a:srgbClr val="496E90"/></a:accent2><a:accent3><a:srgbClr val="4D887C"/></a:accent3><a:accent4><a:srgbClr val="BE7A4B"/></a:accent4><a:accent5><a:srgbClr val="7E6BA1"/></a:accent5><a:accent6><a:srgbClr val="B5B6B8"/></a:accent6><a:hlink><a:srgbClr val="0563C1"/></a:hlink><a:folHlink><a:srgbClr val="954F72"/></a:folHlink></a:clrScheme><a:fontScheme name="Aptos"><a:majorFont><a:latin typeface="Aptos Display"/></a:majorFont><a:minorFont><a:latin typeface="Aptos"/></a:minorFont></a:fontScheme><a:fmtScheme name="Default"><a:fillStyleLst><a:solidFill><a:schemeClr val="accent1"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="12700"><a:solidFill><a:schemeClr val="accent1"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="lt1"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>'],
+ ...pages.flatMap(([title,items],i)=>[['ppt/slides/slide'+(i+1)+'.xml',slide(title,items,i+1,pages.length)],['ppt/slides/_rels/slide'+(i+1)+'.xml.rels',wrapper(rel('../slideLayouts/slideLayout1.xml','slideLayout','rId1'))]])
+ ];
+ return zipEntries(entries);
 }
 export function buildAuditPptx(snapshot,rows){
  const m=summarize(rows,snapshot.overlaps||[]);
@@ -150,20 +168,6 @@ export function buildAuditPptx(snapshot,rows){
   ]]
  ].map(([t,...x])=>[t,x.flat()]);
 
- const ct='<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/><Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/><Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>'+pages.map((_,i)=>'<Override PartName="/ppt/slides/slide'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>').join('')+'</Types>';
- const rel=(target,type,id)=>'<Relationship Id="'+id+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/'+type+'" Target="'+target+'"/>';
- const wrapper=s=>'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+s+'</Relationships>';
- const entries=[
- ['[Content_Types].xml',ct],['_rels/.rels',wrapper(rel('ppt/presentation.xml','officeDocument','rId1'))],
- ['ppt/presentation.xml','<p:presentation xmlns:a="'+aNs+'" xmlns:r="'+rNs+'" xmlns:p="'+pNs+'"><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst><p:sldIdLst>'+pages.map((_,i)=>'<p:sldId id="'+(256+i)+'" r:id="rId'+(i+2)+'"/>').join('')+'</p:sldIdLst><p:sldSz cx="12192000" cy="6858000"/><p:notesSz cx="6858000" cy="9144000"/></p:presentation>'],
- ['ppt/_rels/presentation.xml.rels',wrapper(rel('slideMasters/slideMaster1.xml','slideMaster','rId1')+pages.map((_,i)=>rel('slides/slide'+(i+1)+'.xml','slide','rId'+(i+2))).join(''))],
- ['ppt/slideMasters/slideMaster1.xml','<p:sldMaster xmlns:a="'+aNs+'" xmlns:r="'+rNs+'" xmlns:p="'+pNs+'"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld><p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle/><p:bodyStyle/><p:otherStyle/></p:txStyles></p:sldMaster>'],
- ['ppt/slideMasters/_rels/slideMaster1.xml.rels',wrapper(rel('../slideLayouts/slideLayout1.xml','slideLayout','rId1')+rel('../theme/theme1.xml','theme','rId2'))],
- ['ppt/slideLayouts/slideLayout1.xml','<p:sldLayout xmlns:a="'+aNs+'" xmlns:r="'+rNs+'" xmlns:p="'+pNs+'" type="blank" preserve="1"><p:cSld name="En blanco"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>'],
- ['ppt/slideLayouts/_rels/slideLayout1.xml.rels',wrapper(rel('../slideMasters/slideMaster1.xml','slideMaster','rId1'))],
- ['ppt/theme/theme1.xml','<a:theme xmlns:a="'+aNs+'" name="Institucional V09"><a:themeElements><a:clrScheme name="Azul"><a:dk1><a:srgbClr val="152F4B"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="1E3A5F"/></a:dk2><a:lt2><a:srgbClr val="E9F0F7"/></a:lt2><a:accent1><a:srgbClr val="B68A43"/></a:accent1><a:accent2><a:srgbClr val="496E90"/></a:accent2><a:accent3><a:srgbClr val="4D887C"/></a:accent3><a:accent4><a:srgbClr val="BE7A4B"/></a:accent4><a:accent5><a:srgbClr val="7E6BA1"/></a:accent5><a:accent6><a:srgbClr val="B5B6B8"/></a:accent6><a:hlink><a:srgbClr val="0563C1"/></a:hlink><a:folHlink><a:srgbClr val="954F72"/></a:folHlink></a:clrScheme><a:fontScheme name="Aptos"><a:majorFont><a:latin typeface="Aptos Display"/></a:majorFont><a:minorFont><a:latin typeface="Aptos"/></a:minorFont></a:fontScheme><a:fmtScheme name="Default"><a:fillStyleLst><a:solidFill><a:schemeClr val="accent1"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="12700"><a:solidFill><a:schemeClr val="accent1"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="lt1"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>'],
- ...pages.flatMap(([title,items],i)=>[['ppt/slides/slide'+(i+1)+'.xml',slide(title,items,i+1,pages.length)],['ppt/slides/_rels/slide'+(i+1)+'.xml.rels',wrapper(rel('../slideLayouts/slideLayout1.xml','slideLayout','rId1'))]])
- ];
- return zipEntries(entries);
+ return buildSlideDeck(pages);
 }
 export const exportAuditPptx=(snap,rows)=>download(buildAuditPptx(snap,rows),'auditoria_integral_eje_no_penal_'+now()+'.pptx','application/vnd.openxmlformats-officedocument.presentationml.presentation');
