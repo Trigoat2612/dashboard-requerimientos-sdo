@@ -69,23 +69,87 @@ function slide(title,items,i,total) {
 }
 export function buildAuditPptx(snapshot,rows){
  const m=summarize(rows,snapshot.overlaps||[]);
- const byCat=Object.entries(rows.reduce((a,r)=>(a[r.eligibility||'Sin dato']=(a[r.eligibility||'Sin dato']||0)+1,a),{}));
- const groups=Object.entries(rows.filter(r=>r.estimate_id).reduce((a,r)=>(a[r.v08_agent||'Sin agente']=(a[r.v08_agent||'Sin agente']||0)+Number(r.pert_expected||0),a),{})).sort((a,b)=>b[1]-a[1]);
- const pending=rows.filter(r=>r.eligibility!=='EXCLUIDO'&&!r.estimate_id).length;
+ const classification=Object.entries(m.classification).sort((a,b)=>b[1]-a[1]);
+ const newer=rows.filter(r=>r.final_new).sort((a,b)=>Number(b.final_pert||0)-Number(a.final_pert||0));
+ const byArea=Object.entries(newer.reduce((a,r)=>(a[r.area||'Sin especialidad']=(a[r.area||'Sin especialidad']||0)+Number(r.final_pert||0),a),{})).sort((a,b)=>b[1]-a[1]);
+ const cut=snapshot.sourceVersion||'Sin versión final';
  const pages=[
- ['Diagnóstico contractual y esfuerzo incremental',['Auditoría Integral SDO · EJE No Penal','Universo: '+m.total+' solicitudes (corte filtrado)','Fecha: '+now(),'Fuente: cuatro esquemas Neon, sin conformidades inferidas']],
- ['Objetivo y alcance',['Determinar incrementos reales frente a obligaciones SDO y brechas','318 solicitudes originales y 331 registros Laboral en el universo','Trazabilidad V07, revisión correctiva V2 y estimación V08','Separar hechos, estimaciones técnicas y aprobaciones']],
- ['Distribución de elegibilidad',...byCat.map(([k,v])=>[k+': '+v]),],
- ['Obligaciones y exclusiones',['Excluidos: '+m.excluded,'Obligación SDO vinculada (clasificación): '+m.sdoCovered,'Brecha contractual vinculada (clasificación): '+m.gapCovered,'Cobertura documental y cumplimiento funcional son dimensiones distintas']],
- ['Incrementos firmes y condicionales',['Incrementales firmes: '+m.firm,'Incrementales condicionados: '+m.conditional,'Estimaciones cerradas: '+m.estimated,'Pendientes de estimación: '+m.pending,'Las condicionales NO se incorporan automáticamente a bolsa firme']],
- ['Escenarios WBS / PERT',['Firme optimista: '+fmtHours(m.firmHours.optimistic),'Firme PERT: '+fmtHours(m.firmHours.pert),'Firme pesimista: '+fmtHours(m.firmHours.pessimistic),'Condicional PERT: '+fmtHours(m.conditionalHours.pert),'Contingencias firmes: '+fmtHours(m.firmHours.contingency)]],
- ['Esfuerzo por especialidad y agente',...groups.slice(0,7).map(([k,v])=>[k+': '+fmtHours(v)])],
- ['Avance de estimaciones',['Solicitudes estimadas: '+m.estimated,'Estimación pendiente: '+pending,'Pendientes de QA: '+m.pendingQA,'QA técnico aceptado: '+fmtHours(m.qaHours),'Horas contractuales aprobadas: Sin aprobación verificable']],
- ['Riesgos y condiciones',['Solapamientos sin resolver: '+m.overlaps,'Fuentes: matriz de relaciones y componentes compartidos','Condiciones de elegibilidad deben validarse antes de contratación','No duplicar costo de construcción común']],
- ['Exclusiones R48',['Frente R48: revisar 34 de configuración y 14 fuera de alcance','Estado: '+(snapshot.r48?.registryStatus||'sin registro'),'No sustituir V2 sin resolución autorizada','Las exclusiones mantienen versión y fundamento']],
- ['Conclusiones sustentadas',['Una obligación SDO existente no vuelve a financiarse con bolsa','La estimación bruta no equivale a QA ni a aprobación','Solapamientos pendientes exigen conciliación','Revisar aceptación funcional antes de declarar incumplimiento']],
- ['Recomendaciones y decisiones pendientes',['V00: resolver solapamientos y QA V08','GSJ / GTI: validar supuestos funcionales y límites por sistema','PEJENP: decidir imputación contractual con fuente verificable','Mantener trazabilidad SDO, brechas, V07, V2 y V08']]
+  ['Auditoría SDO y novedad técnica EJE',[
+   'PROGRAMA EJE NO PENAL · DIAGNÓSTICO GERENCIAL',
+   'Cierre técnico: '+cut,
+   'Solicitudes consideradas: '+m.total+' (selección actual)',
+   'Novedades EJE acreditadas: '+m.newCount,
+   'PERT final reconocido: '+fmtHours(m.finalHours.pert),
+   'Corte de exportación: '+now()
+  ]],
+  ['Objetivo y universo de la auditoría',[
+   'Requisitos SDO inventariados: '+(snapshot.sdo||[]).length,
+   'Registros de brechas Laboral: '+(snapshot.gaps||[]).length,
+   'Solicitudes de la auditoría integral: 318 códigos únicos',
+   'Novedad técnica: solo funcionalidades nuevas dentro del EJE',
+   'Fuente de cierre: '+cut
+  ]],
+  ['Clasificación definitiva de las solicitudes',...classification.map(([k,v])=>[k+': '+v])],
+  ['Nuevas funcionalidades reconocidas',...newer.map(r=>[r.code+' · '+fmtHours(r.final_pert)+' · '+String(r.description||'').slice(0,80)])],
+  ['Obligaciones y exclusiones',[
+   'Solicitudes sin incremento EJE: '+m.notNew,
+   'Cobertura contractual SDO: '+m.sdoCovered,
+   'Brechas originales: '+m.gapCovered,
+   'Configuración/corrección: '+m.configuration,
+   'Cambios en sistemas externos: '+m.external,
+   'Duplicidades: '+m.duplicates,
+   'Novedad no acreditada: '+m.notAccredited,
+   'Reformulación pendiente: '+m.reformulation
+  ]],
+  ['Escenarios WBS / PERT finales',[
+   'Optimista (O): '+fmtHours(m.finalHours.optimistic),
+   'Más probable (M): '+fmtHours(m.finalHours.mostLikely),
+   'Horas esperadas PERT: '+fmtHours(m.finalHours.pert),
+   'Pesimista (P): '+fmtHours(m.finalHours.pessimistic),
+   'Fórmula por actividad: PERT = (O + 4 × M + P) / 6',
+   'Actividades WBS técnicamente admitidas: '+m.wbsAccepted
+  ]],
+  ['Esfuerzo incremental por especialidad',...byArea.map(([k,v])=>[k+': '+fmtHours(v)])],
+  ['Estimaciones: bruto frente a incremento',[
+   'PERT bruto referencial histórico: '+fmtHours(m.referenceBruteHours),
+   'PERT final técnicamente reconocido: '+fmtHours(m.finalHours.pert),
+   'PERT no incluido: '+fmtHours(m.notIncludedHours),
+   'Solicitudes con estimación histórica: '+m.technicalHistorical,
+   'Solicitudes NUEVO_EJE: '+m.newCount,
+   'El bruto histórico no constituye trabajo nuevo.'
+  ]],
+  ['Sistemas externos y alcance original',[
+   'Cambio directo SIJ/REMAJU/SERNOT/otros: '+m.external,
+   'No corresponde estimar trabajo externo como desarrollo EJE.',
+   'Reformular la funcionalidad para interoperar desde EJE cuando corresponda.',
+   'Atender las obligaciones SDO y brechas sin reestimarlas.',
+   'La existencia de obligación no demuestra su implementación.'
+  ]],
+  ['R48, duplicidad y solapamientos',[
+   'Dictámenes R48 V4 registrados: '+(snapshot.r48?.scope||[]).length,
+   'Resoluciones R48 V5 registradas: '+(snapshot.r48?.resolutions||[]).length,
+   'Relaciones de solapamiento incluidas: '+m.overlaps,
+   'Descuento de componentes solo con sustento verificable.',
+   'Cierre de novedad V00 V9 prevalece sobre escenarios anteriores.'
+  ]],
+  ['Conclusiones técnicas verificables',[
+   m.newCount+' funcionalidades nuevas EJE acreditadas de '+m.total+' solicitudes.',
+   'Esfuerzo esperado reconocido: '+fmtHours(m.finalHours.pert),
+   m.notNew+' solicitudes no integran la suma de nuevos desarrollos.',
+   m.notAccredited+' no acreditan novedad técnica con evidencia suficiente.',
+   'No utilizar las WBS excluidas como incremento del programa.',
+   'Los resultados se derivan de registros individuales V00 V9.'
+  ]],
+  ['Recomendaciones y próximos controles',[
+   'Softplan: atender obligaciones originalmente contratadas.',
+   'GTI y sistemas satélite: coordinar cambios fuera del EJE.',
+   'GSJ/PEJENP: delimitar reformulaciones exclusivamente EJE.',
+   'Equipo técnico: conservar fuentes, versiones, QA y solapamientos.',
+   'No presentar esta estimación técnica como aprobación financiera.',
+   'Actualizar tablero desde Neon sin reconstruir dictámenes.'
+  ]]
  ].map(([t,...x])=>[t,x.flat()]);
+
  const ct='<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/><Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/><Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>'+pages.map((_,i)=>'<Override PartName="/ppt/slides/slide'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>').join('')+'</Types>';
  const rel=(target,type,id)=>'<Relationship Id="'+id+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/'+type+'" Target="'+target+'"/>';
  const wrapper=s=>'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+s+'</Relationships>';
