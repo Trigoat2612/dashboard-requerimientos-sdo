@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
 import {reconcileV13,loadSnapshot,loadDetail} from '../api/report-v13.js';
 import {filterReport,summarizeReport,INCREMENTAL} from '../src/report-v13-model.js';
 import {buildV13Xlsx,buildV13Pptx} from '../src/report-v13-export.js';
@@ -89,4 +90,27 @@ test('PPTX genera doce diapositivas con resultados V13 y sin reemplazar valores'
  assert.ok(encoded.includes('ppt/slides/slide12.xml'));
  assert.ok(encoded.includes('13.547,86'));
  assert.ok(encoded.includes('122'));
+});
+
+test('Excel y PPTX del informe contienen XML válido y archivos ZIP íntegros',()=>{
+ const f=fixture(),xlsx=buildV13Xlsx({},f),pptx=buildV13Pptx({...f,reconciliation:{activities:635}});
+ const python=[
+ 'import sys,io,zipfile,xml.etree.ElementTree as ET',
+ 'raw=bytes.fromhex(sys.stdin.read().strip())',
+ 'z=zipfile.ZipFile(io.BytesIO(raw))',
+ 'assert z.testzip() is None',
+ 'names=set(z.namelist())',
+ 'assert "[Content_Types].xml" in names',
+ 'for name in names:',
+ '    if name.endswith(".xml") or name.endswith(".rels"): ET.fromstring(z.read(name))',
+ 'if "xl/workbook.xml" in names:',
+ '    assert all("xl/worksheets/sheet"+str(i)+".xml" in names for i in range(1,8))',
+ 'if "ppt/presentation.xml" in names:',
+ '    assert all("ppt/slides/slide"+str(i)+".xml" in names for i in range(1,13))',
+ 'print("OK",len(names))'
+ ].join('\\n');
+ for(const [type,content] of [['XLSX',xlsx],['PPTX',pptx]]){
+  const result=spawnSync('python3',['-c',python],{input:Buffer.from(content).toString('hex'),encoding:'utf8',maxBuffer:1024*1024});
+  assert.equal(result.status,0,type+': '+(result.stderr||result.stdout));
+ }
 });
