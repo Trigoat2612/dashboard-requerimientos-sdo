@@ -24,7 +24,7 @@ async function verify(){
 
  const finalVersion=data.body.sourceVersion;
  assert.ok(finalVersion?.includes('NOVEDAD-TECNICA-V9'),'Solo cierre técnico V00 V9 vigente');
- assert.equal(data.body.managerial.universo_318,318,'Referencia gerencial unívoca');
+ assert.equal(Number(data.body.managerial.universo_318),318,'Referencia gerencial unívoca');
  const final=rows.filter(r=>r.final_new);
  assert.equal(final.length,Number(data.body.managerial.novedades_eje),'Contar únicamente NUEVO_EJE');
  assert.ok(final.every(r=>r.final_decision==='NUEVO_EJE'),'La estimación final es estrictamente de novedad técnica');
