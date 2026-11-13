@@ -120,13 +120,14 @@ function Matrix({rows,onOpen}){
  <td><button className="ai-btn small" onClick={()=>onOpen(r.code)}>Ver ficha <ChevronRight size={14}/></button></td>
  </tr>)}</Tabular>;
 }
-function Obligations({rows,onOpen,onSdo}){
+function Obligations({rows,onOpen,onSdo,sdoCatalog=[]}){
+ const bySdo=new Map(sdoCatalog.map(x=>[x.code,x]));
  const excluded=rows.filter(r=>r.eligibility==='EXCLUIDO');
  return <Block title="Obligaciones contractuales y exclusiones" subtitle="La obligación contractual y su cumplimiento operativo se informan por separado. No toda exclusión corresponde a Softplan.">
  <Tabular headers={['Solicitud','Motivo de exclusión','SDO contractual identificado','Brecha vinculada','Equivalencia funcional','Estado de cumplimiento','Esfuerzo adicional','Sustento']}>
  {excluded.map(r=><tr key={r.code}><td><button className="ai-btn small" onClick={()=>onOpen(r.code)}>{r.code}</button><small>{r.description?.slice(0,120)}</small></td>
  <td>{labels[r.v07_category]||r.v07_category||'Sin causa sustentada'}<small>{r.v2_decision}</small></td>
- <td>{(r.sdo_links||[]).length?r.sdo_links.map(s=><button key={s.code} className="ai-link" onClick={()=>onSdo(s.code)}>{s.code}</button>):'Sin SDO vinculado'}</td>
+ <td>{(r.sdo_links||[]).length?r.sdo_links.map(s=><div key={s.code}><button className="ai-link" onClick={()=>onSdo(s.code)}>{s.code}</button><small>{(bySdo.get(s.code)?.description||'Sin texto contractual localizado').slice(0,300)}</small></div>):'Sin SDO vinculado'}</td>
  <td>{(r.gap_links||[]).map(s=>s.id).join(', ')||'Sin brecha vinculada'}</td>
  <td className="ai-long">{alt(r.sdo_equivalence,r.original_covered_scope||r.exclusion_zero_reason)}</td>
  <td>Por verificar funcionalmente<small>SDO ≠ cumplimiento demostrado</small></td>
@@ -273,7 +274,7 @@ export default function IntegratedAudit({view='resumen',onNavigate=()=>{}}){
  <div><button className="ai-btn secondary" onClick={()=>exportAuditXlsx(filtered)}><Download size={15}/> Excel 318</button><button className="ai-btn primary" onClick={()=>exportAuditPptx(snap,filtered)}><BarChart3 size={15}/> PowerPoint gerencial</button></div></div>
  {view==='resumen'&&<Overview rows={filtered} snapshot={snap} m={metrics} onOpen={openDetail} onSwitch={setView}/>}
  {view==='matriz318'&&<><Matrix rows={visible} onOpen={openDetail}/><Pagination page={page} setPage={setPage} total={matched.length} pageSize={pageSize}/></>}
- {view==='obligaciones318'&&<Obligations rows={filtered} onOpen={openDetail} onSdo={code=>onNavigate('sdo',code,{kind:'sdo',id:code})}/>}
+ {view==='obligaciones318'&&<Obligations rows={filtered} sdoCatalog={snap.sdo||[]} onOpen={openDetail} onSdo={code=>onNavigate('sdo',code,{kind:'sdo',id:code})}/>}
  {view==='brechasLaboral'&&<GapTable gaps={snap.gaps||[]} rows={all} onOpen={openDetail} onSdo={code=>onNavigate('sdo',code,{kind:'sdo',id:code})}/>}
  {view==='avancev08'&&<AgentProgress snap={snap} rows={all} onOpen={openDetail}/>}
  {view==='exclusionesr48'&&<Exclusions rows={all} onOpen={openDetail} r48={snap.r48}/>}
