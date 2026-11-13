@@ -3,29 +3,24 @@ import InstitutionalLogin from './InstitutionalLogin.jsx';
 import InstitutionalDetailPanel from './InstitutionalDetailPanel.jsx';
 import AuditV2 from './AuditV2.jsx';
 import V09Overview from './V09Overview.jsx';
-import IntegratedAudit from './IntegratedAudit.jsx';
+import ReportV13 from './ReportV13.jsx';
 import GapExplorer from './GapExplorer.jsx';
 import { toSafeCsv } from './csv-utils.js';
 import {Activity,BookOpen,ClipboardList,FileText,Layers,Calculator,Search,RefreshCw,ExternalLink,ChevronRight,CheckCircle2,AlertCircle,Menu,X,Save,Download,Database,Filter,ShieldCheck,Clock3} from 'lucide-react';
 
 const tabs=[
-  {id:'resumen',label:'Resumen gerencial integral',icon:Activity},
-  {id:'matriz318',label:'Matriz integral · 318 solicitudes',icon:ClipboardList},
-  {id:'obligaciones318',label:'Obligaciones contractuales',icon:BookOpen},
-  {id:'brechasLaboral',label:'331 brechas Laboral',icon:ShieldCheck},
-  {id:'avancev08',label:'Avance estimaciones V08',icon:Calculator},
-  {id:'exclusionesr48',label:'Exclusiones · R48',icon:Filter},
-  {id:'solapamientosv08',label:'Solapamientos y componentes',icon:Layers},
-  {id:'historicoV09',label:'Indicadores V09 anteriores',icon:Clock3},
-  {id:'v2',label:'Auditoría y control V00–V08',icon:ShieldCheck},
-  {id:'sdo',label:'Cumplimiento SDO · V06',icon:BookOpen},
-  {id:'nuevos',label:'Clasificación de solicitudes · V07',icon:ClipboardList},
-  {id:'brechas',label:'Brechas consolidadas',icon:AlertCircle},
-  {id:'documentos',label:'Bitácora documental',icon:FileText},
-  {id:'cobertura',label:'Contraste SDO y evidencias',icon:ShieldCheck},
-  {id:'auditoria',label:'Auditoría de cobertura',icon:Filter},
-  {id:'metodos',label:'Bolsa de horas · V08',icon:Calculator},
-  {id:'historico',label:'Resumen histórico de triaje',icon:Clock3}
+  {id:'resumen',label:'Resumen gerencial',icon:Activity},
+  {id:'matriz318',label:'Análisis de requerimientos',icon:ClipboardList},
+  {id:'incrementales',label:'Funcionalidades incrementales',icon:BarChart3},
+  {id:'criterios',label:'Criterios y metodología',icon:BookOpen},
+  {id:'obligaciones318',label:'Obligaciones originales',icon:ShieldCheck},
+  {id:'brechasLaboral',label:'Brechas Laboral',icon:Layers},
+  {id:'exclusionesr48',label:'Exclusiones y reformulación',icon:Filter},
+  {id:'documentos',label:'Documentación y evidencias',icon:FileText},
+  {id:'sdo',label:'Requisitos SDO',icon:BookOpen},
+  {id:'cobertura',label:'Contraste documental SDO',icon:ShieldCheck},
+  {id:'auditoria',label:'Auditoría documental',icon:ClipboardList},
+  {id:'metodos',label:'Métodos de estimación',icon:Calculator}
 ];
 const states=['Cubierta','Pendiente contractual','Brecha existente','Duplicada','Genuinamente nueva','Indeterminada','Sin evaluación V07'];
 const compliance=['Por verificar','Cumple','Cumple parcialmente','No cumple','No aplica'];
@@ -182,8 +177,8 @@ export default function App(){
       {data.generatedAt&&<div className="mini">Última consulta de registros: {new Date(data.generatedAt).toLocaleString('es-PE')}</div>}
       {assessmentFetch.loading&&['cobertura','auditoria'].includes(active)&&<div className="insight" role="status"><FileText size={18}/><div><b>Cargando trazabilidad documental</b><p>{assessmentFetch.loaded} de {assessmentFetch.total||'…'} evaluaciones recuperadas en lotes autorizados.</p></div></div>}
       {publicRedacted&&active!=='resumen'&&<div className="insight"><ShieldCheck size={18}/><div><b>Consulta disponible · datos protegidos</b><p>El inventario y los análisis documentales, con sus títulos y enlaces, pueden consultarse íntegramente. Los fundamentos independientes V06/V07 se distinguen de las conformidades oficiales.</p></div></div>}
-      <header className="page-header"><div><span className="eyebrow">CONTROL Y TRAZABILIDAD</span><h1>{tabs.find(t=>t.id===active)?.label}</h1><p>{active==='v2'?'Avance independiente de la auditoría documental, el cumplimiento SDO, las brechas, las solicitudes y la bolsa de horas.':active==='resumen'?'Corte integrado de V06, V07 y V08 basado en Neon y separado de conformidades oficiales.':active==='historico'?'Vista histórica sin estimaciones sustentadas ni detalles restringidos.':active==='sdo'?'Requisitos SDO codificados y dictámenes propuestos V06; el texto contractual público se conserva; fundamentos V06 detallados requieren autorización.':active==='nuevos'?'Solicitudes clasificadas por V07. El texto original ya público se conserva; condiciones contractuales V07 detalladas requieren autorización.':active==='documentos'?'Inventario documental íntegro: títulos, enlaces y análisis disponibles sin filtros por nombre del archivo.':active==='cobertura'?'Evaluaciones por documento y criterio SDO, diferenciando evidencia de conformidad.':active==='auditoria'?'Auditoría de inventario: vínculo documental no equivale a cumplimiento.':'Contraste de métodos para dimensionar la bolsa de horas y sus riesgos.'}</p></div><span className="live"><span className="green-dot"/> {loading?'Cargando':restricted?'Sin conexión de detalle':publicRedacted?'Datos anonimizados de Neon':publicLegacy?'Consulta pública documental':'Consulta institucional autorizada'}</span></header>
-      {['resumen','matriz318','obligaciones318','brechasLaboral','avancev08','exclusionesr48','solapamientosv08'].includes(active)&&<IntegratedAudit view={active} onNavigate={nav}/>}
+      <header className="page-header"><div><span className="eyebrow">CONTROL Y TRAZABILIDAD</span><h1>{tabs.find(t=>t.id===active)?.label}</h1><p>{active==='v2'?'Avance independiente de la auditoría documental, el cumplimiento SDO, las brechas, las solicitudes y la bolsa de horas.':active==='resumen'?'Resultados consolidados de 318 solicitudes, 122 funcionalidades incrementales propuestas y estimación WBS/PERT para evaluación del usuario final.':active==='historico'?'Vista histórica sin estimaciones sustentadas ni detalles restringidos.':active==='sdo'?'Requisitos SDO codificados y dictámenes propuestos V06; el texto contractual público se conserva; fundamentos V06 detallados requieren autorización.':active==='nuevos'?'Solicitudes clasificadas por V07. El texto original ya público se conserva; condiciones contractuales V07 detalladas requieren autorización.':active==='documentos'?'Inventario documental íntegro: títulos, enlaces y análisis disponibles sin filtros por nombre del archivo.':active==='cobertura'?'Evaluaciones por documento y criterio SDO, diferenciando evidencia de conformidad.':active==='auditoria'?'Auditoría de inventario: vínculo documental no equivale a cumplimiento.':'Contraste de métodos para dimensionar la bolsa de horas y sus riesgos.'}</p></div><span className="live"><span className="green-dot"/> {loading?'Cargando':restricted?'Sin conexión de detalle':publicRedacted?'Datos anonimizados de Neon':publicLegacy?'Consulta pública documental':'Consulta institucional autorizada'}</span></header>
+      {['resumen','matriz318','incrementales','criterios','obligaciones318','brechasLaboral','exclusionesr48'].includes(active)&&<ReportV13 view={active} onNavigate={nav}/>}
        {active==='historicoV09'&&<V09Overview onNavigate={nav}/>}
       {active==='v2'&&<AuditV2/>}
       {active==='brechas'&&<GapExplorer onOpenSdo={code=>nav('sdo',code,{kind:'sdo',id:code})} onOpenRequest={code=>nav('nuevos',code,{kind:'request',id:code})}/>}
