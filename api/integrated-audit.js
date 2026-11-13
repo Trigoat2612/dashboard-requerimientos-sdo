@@ -181,8 +181,31 @@ export async function loadRequestDetail(sql, code) {
     sql`SELECT ev.* FROM ejenp_estimacion_v08.audit_events ev JOIN ejenp_estimacion_v08.estimation_units u ON u.id=ev.unit_id WHERE u.request_id=${id} ORDER BY ev.created_at,ev.id`,
     sql`SELECT * FROM ejenp_estimacion_v08.eligibility_revisions_v2 WHERE request_id=${id} ORDER BY review_version,reviewed_at,id`
   ]);
+  const [closure, finalWbsRows, r48Scope, r48Resolutions, overlapV00] = await Promise.all([
+    sql`SELECT * FROM ejenp_estimacion_v08.v00_final_novedad_318_v9 WHERE code=${code}`,
+    sql`SELECT * FROM ejenp_estimacion_v08.v00_novedad_wbs_v9 WHERE codigo=${code} ORDER BY codigo_actividad`,
+    sql`SELECT * FROM ejenp_estimacion_v08.v00_r48_final_scope_v4 WHERE source_code=${code} ORDER BY decided_at DESC`,
+    sql`SELECT * FROM ejenp_estimacion_v08.v00_r48_resolutions_v5 WHERE source_code=${code} ORDER BY decided_at DESC`,
+    sql`SELECT * FROM ejenp_estimacion_v08.v00_overlap_dashboard_49_v7 WHERE code_a=${code} OR code_b=${code}`
+  ]);
+  if(closure.length!==1) throw new Error('Cierre técnico V00 V9 ausente o ambiguo para '+code);
+  const finalDecision=closure[0];
+  const admittedWbs=finalWbsRows.map((x,i)=>({
+    id:x.codigo_actividad||i,activity_code:x.codigo_actividad,phase:x.fase,
+    description:x.actividad,incremental_basis:x.fundamento_incremental,
+    o:x.optimistas,m:x.mas_probables,p:x.pesimistas,pert:x.horas_pert,
+    effort_scope:x.alcance_esfuerzo,component_key:x.componente_compartido,
+    notes:x.observacion
+  }));
+  if(finalDecision.es_novedad_acreditada && 
+     (!admittedWbs.length ||
+       Math.abs(admittedWbs.reduce((n,x)=>n+Number(x.pert||0),0)-Number(finalDecision.horas_pert_admitidas||0))>0.02))
+    throw new Error('WBS admitida y cierre final no concilian para '+code);
   return {request,assessments,qa,conditions,sdoLinks,gapLinks,documents,units,related,overlaps,
-    wbs,risks,assumptions,contingencies,methods,deps,usage,peerReviews,qualityChecks,events,v2};
+    // WBS autorizada por el dictamen TÉCNICO V9; la WBS V08 preliminar sigue consultable aparte.
+    wbs:finalDecision.es_novedad_acreditada ? admittedWbs : [],
+    historicalWbs:wbs,finalDecision,r48Scope,r48Resolutions,overlapV00,
+    risks,assumptions,contingencies,methods,deps,usage,peerReviews,qualityChecks,events,v2};
 }
 
 // Solo para descarga Excel: texto técnico/contractual íntegro, solicitado bajo demanda.
@@ -194,7 +217,13 @@ export async function loadAuditExport(sql) {
    v.sdo_equivalence AS equivalence_full,v.quality_reason AS v2_quality_reason,
    v.document_references,
    es.expert_justification AS estimate_justification,
-   es.technical_sources AS estimate_sources
+   es.technical_sources AS estimate_sources,
+   f.decision_tecnica_final AS decision_final_export, 
+   f.version_cierre_tecnico AS version_final_export,
+   f.fundamento_tecnico_final AS fundamento_final_export,
+   f.fuentes_tecnicas_finales AS fuentes_final_export,
+   f.horas_pert_admitidas AS pert_final_export,
+   f.horas_no_incluidas AS excluded_final_export
   FROM ejenp_auditoria_318.requests r
   LEFT JOIN LATERAL (SELECT * FROM ejenp_auditoria_318.technical_assessments a
       WHERE a.request_id=r.id ORDER BY a.revision_no DESC,a.id DESC LIMIT 1) a ON TRUE
@@ -203,6 +232,7 @@ export async function loadAuditExport(sql) {
   LEFT JOIN LATERAL (SELECT es.* FROM ejenp_estimacion_v08.estimation_units u
       JOIN ejenp_estimacion_v08.estimates es ON es.unit_id=u.id
       WHERE u.request_id=r.id ORDER BY es.revision_no DESC,es.id DESC LIMIT 1) es ON TRUE
+  LEFT JOIN ejenp_estimacion_v08.v00_final_novedad_318_v9 f ON f.request_id=r.id
   ORDER BY r.source_code`;
 }
 
