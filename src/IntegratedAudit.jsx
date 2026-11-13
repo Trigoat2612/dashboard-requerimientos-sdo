@@ -146,18 +146,26 @@ function Matrix({rows,onOpen}){
   <td><button className="ai-btn small" onClick={()=>onOpen(r.code)}>Ver sustento <ChevronRight size={14}/></button></td>
  </tr>)}</Tabular>;
 }
+
 function Obligations({rows,onOpen,onSdo,sdoCatalog=[]}){
  const bySdo=new Map(sdoCatalog.map(x=>[x.code,x]));
- const excluded=rows.filter(r=>r.eligibility==='EXCLUIDO');
- return <Block title="Obligaciones contractuales y exclusiones" subtitle="La obligación contractual y su cumplimiento operativo se informan por separado. No toda exclusión corresponde a Softplan.">
- <Tabular headers={['Solicitud','Motivo de exclusión','SDO contractual identificado','Brecha vinculada','Equivalencia funcional','Estado de cumplimiento','Esfuerzo adicional','Sustento']}>
- {excluded.map(r=><tr key={r.code}><td><button className="ai-btn small" onClick={()=>onOpen(r.code)}>{r.code}</button><small>{r.description?.slice(0,120)}</small></td>
- <td>{labels[r.v07_category]||r.v07_category||'Sin causa sustentada'}<small>{r.v2_decision}</small></td>
- <td>{(r.sdo_links||[]).length?r.sdo_links.map(s=><div key={s.code}><button className="ai-link" onClick={()=>onSdo(s.code)}>{s.code}</button><small>{(bySdo.get(s.code)?.description||'Sin texto contractual localizado').slice(0,300)}</small></div>):'Sin SDO vinculado'}</td>
- <td>{(r.gap_links||[]).map(s=>s.id).join(', ')||'Sin brecha vinculada'}</td>
- <td className="ai-long">{alt(r.sdo_equivalence,r.original_covered_scope||r.exclusion_zero_reason)}</td>
- <td>Por verificar funcionalmente<small>SDO ≠ cumplimiento demostrado</small></td>
- <td><b>0 h propias</b></td><td>{alt(r.exclusion_zero_reason,r.exclusion_reason||r.estimation_exclusions)}</td>
+ const eligible=rows.filter(r=>['ALCANCE_ORIGINAL_SDO','ALCANCE_ORIGINAL_BRECHA'].includes(r.final_decision));
+ return <Block title="Obligaciones originales exigibles a Softplan" subtitle="Únicamente solicitudes clasificadas por V00 V9 como funcionalidad original SDO o brecha original. Otras exclusiones no se imputan automáticamente a Softplan.">
+ <p className="ai-note">{eligible.length} obligaciones originales identificadas. Su implementación y funcionamiento deben verificarse por separado; no se financian por segunda vez con horas adicionales.</p>
+ <Tabular headers={['Solicitud','Decisión final','SDO contractual','Brecha original','Alcance ya contratado','Fundamento técnico','Responsable / sistema','Implementación','Incremento admitido','Detalle']}>
+ {eligible.map(r=><tr key={r.code}>
+  <td><button className="ai-btn small" onClick={()=>onOpen(r.code)}>{r.code}</button><small>{r.description?.slice(0,150)}</small></td>
+  <td><Chip>{labels[r.final_decision]}</Chip></td>
+  <td>{(r.sdo_links||[]).length?r.sdo_links.map(l=><div key={l.code}>
+   <button className="ai-link" onClick={()=>onSdo(l.code)}>{l.code}</button><small>{(bySdo.get(l.code)?.description||'Sin texto contractual localizado').slice(0,350)}</small>
+   </div>):r.requisitos_sdo||'Sin referencia específica'}</td>
+  <td>{r.brechas_relacionadas||(r.gap_links||[]).map(x=>x.id).join(', ')||'Sin brecha vinculada'}</td>
+  <td className="ai-long">{alt(r.funcion_originalmente_exigible)}</td>
+  <td className="ai-long">{alt(r.final_reason)}</td>
+  <td>{alt(r.final_system)}</td>
+  <td>Verificar funcionalmente<small>La SDO no prueba cumplimiento real</small></td>
+  <td className="ai-num"><b>0 h</b></td>
+  <td><button className="ai-btn small" onClick={()=>onOpen(r.code)}>Ver evidencia</button></td>
  </tr>)}</Tabular>
  </Block>;
 }
