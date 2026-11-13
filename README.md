@@ -5,43 +5,58 @@ Dashboard Vite + React, funciones serverless y Neon PostgreSQL, en el repositori
 
 **Producción:** https://dashboard-requerimientos-sdo.vercel.app/  
 **Neon:** `super-credit-91949836` / `neondb` / `ejenp_requerimientos_sdo`.  
-**Fuente vigente de novedad técnica:** cierre V00 V9, con detalle histórico V07/V08 y fuentes de cuatro esquemas Neon, de solo lectura.
+**Fuente de resultados visible:** las cuatro vistas institucionales consolidadas del informe, con evidencias históricas en modo consulta, sin alterar registros.
 
-## Corte ejecutivo vigente: V00 V9 (13/11/2026)
+## Informe institucional consolidado
 
-El dashboard consulta en cada carga `ejenp_estimacion_v08.v00_final_novedad_318_v9`,
-concilia 318 códigos únicos con `v00_novedad_gerencial_v9` y muestra **solo las funcionalidades genuinamente nuevas del EJE** como horas incrementales.
+El módulo principal del dashboard utiliza **exclusivamente** estas cuatro vistas de Neon como fuente
+de las clasificaciones y estimaciones mostradas a la Dirección Ejecutiva:
 
-**Último corte comprobado:** `V00-20261113-NOVEDAD-TECNICA-V9`.
-De 318 solicitudes, 6 están acreditadas como `NUEVO_EJE`, con
-**2.490,833 horas-persona PERT** y 44 actividades WBS admitidas.
-Las 312 restantes no integran el total de nuevos desarrollos. El histórico V07/V08 sigue accesible como antecedente, **pero no se agrega automáticamente** a la bolsa.
+- `ejenp_estimacion_v08.v00_informe_gerencial_v13`
+- `ejenp_estimacion_v08.v00_informe_categorias_v13`
+- `ejenp_estimacion_v08.v00_informe_matriz_318_v13`
+- `ejenp_estimacion_v08.v00_informe_wbs_122_v13`
 
-La solución incluye siete secciones integrales: resumen gerencial, matriz 318, obligaciones originales Softplan,
-331 brechas Laboral, seguimiento V08, exclusiones R48 y 49 relaciones de solapamiento.
-**R48 está registrado** en `v00_r48_final_scope_v4` y
-`v00_r48_resolutions_v5`. El antiguo diagnóstico de falta de R48 corresponde a una versión anterior del tablero.
+**Resultados conciliados:** 318 solicitudes; 122 funcionalidades incrementales propuestas sujetas a evaluación del usuario final; **13.547,86 horas-persona WBS/PERT**; 196 solicitudes de las demás categorías; 175 estimaciones técnicas conservadas y 635 actividades WBS correspondientes a las propuestas.
 
-Un cambio directo a SIJ, REMAJU, SERNOT u otro satélite no se estima como desarrollo EJE. Una reformulación para intervenir exclusivamente EJE debe analizarse como nuevo alcance y contrastarse con SDO y brechas.
+| Clasificación | Solicitudes |
+| --- | ---: |
+| Nuevas funcionalidades incrementales sujetas a evaluación del usuario final | 122 |
+| Funcionalidades comprendidas en SDO | 94 |
+| Funcionalidades comprendidas en brechas | 2 |
+| Solicitudes duplicadas | 8 |
+| Solicitudes sobre sistemas externos y sujetas a reformulación | 86 |
+| Configuraciones y ajustes | 6 |
 
-Los indicadores ejecutivos son técnicos: **no constituyen aprobación de contrato ni de pago**.
-Las pestañas y API anteriores se conservan.
+Las 86 solicitudes incluyen 52 modificaciones directas a sistemas externos y 34 potenciales reformulaciones para EJE. Ninguna de ellas aporta horas al total incremental.
 
-**Rutas de consulta:**
-- `GET /api/integrated-audit?view=snapshot`: 318 solicitudes, dictamen técnico V00 V9, resumen gerencial, brechas Laboral, R48 y solapamientos
-- `GET /api/integrated-audit?view=detail&code=REQ00157`: ficha original y WBS admitida del nuevo EJE
-- `GET /api/integrated-audit?view=detail&code=REQ00613`: ejemplo de cambio externo, con 0 horas EJE y estimación histórica no imputada
-- `GET /api/integrated-audit?view=export`: 318 fundamentos íntegros para Excel
+### Módulo del informe y APIs
 
-Se generan **XLSX de 56 columnas** y **PPTX gerencial de 12 diapositivas** desde el navegador.
-La presentación tiene diseño institucional editable, pero requiere la plantilla oficial cuando esté disponible.
+- **Resumen gerencial:** indicadores, clasificación de seis categorías, especialidades, fases WBS, conclusión y tratamiento técnico
+- **Análisis de requerimientos:** 318 solicitudes, filtros, justificación individual, referencia SDO/brechas y ficha completa
+- **Funcionalidades incrementales:** 122 propuestas con actividades WBS desplegables y sumas PERT por código
+- **Criterios y metodología:** categorías, ejemplos reales, WBS/PERT y comparación con métodos del proveedor documentados en Neon
+- **Consulta documental:** acceso a inventario, evidencias y referencias SDO existentes, sin restaurar `DASHBOARD_ACCESS_KEY`
+- **Excel:** libro XLSX con 7 hojas, incluidas matriz 318, propuestas 122, actividades WBS 635, metodología, referencias, supuestos y riesgos
+- **PowerPoint:** presentación gerencial editable de 12 diapositivas, generada con datos del informe vigente
 
-El flujo `scripts/audit-production-smoke.mjs` verifica por HTTP la URL de producción,
-el cierre V00 V9, la conciliación de horas, la WBS admitida y las exclusiones externas.
-La versión productiva se despliega desde `main` y conserva las verificaciones `npm test` / `npm run build`.
+Endpoint institucional público de solo lectura:
 
-Para el reporte de implementación, consultar
-[`docs/v09-cierre-v00-v9.md`](docs/v09-cierre-v00-v9.md).
+- `GET /api/report-v13?view=snapshot`
+- `GET /api/report-v13?view=detail&code=REQ00157`
+- `GET /api/report-v13?view=wbs`
+- `GET /api/report-v13?view=export`
+
+Cada consulta comprueba la conciliación de códigos, categorías, escenarios y horas. No reestima ni altera los registros de Neon. La UI no presenta las versiones internas como categorías o titulares.
+
+**Publicación:** los cambios se despliegan directamente desde `main` a Vercel.
+El control productivo `scripts/report-v13-production-smoke.mjs` comprueba la navegación cliente,
+la API, el inventario documental y los universos de 318/122/635.
+
+**Limitación del PPTX:** el repositorio no dispone de la plantilla institucional original;
+se utiliza un diseño editable, listo para adaptar cuando exista el archivo fuente.
+
+Para implementación y pruebas ver `docs/v09-publicacion-informe-v13.md`.
 
 ## Consulta documental íntegra
 
@@ -57,7 +72,7 @@ La aplicación **no aplica listas de palabras sensibles, filtros por nombres de 
 
 La apertura efectiva de archivos hospedados en Google Drive u otros servicios sigue sujeta a los permisos del **proveedor del archivo**. Publicar el enlace en el dashboard no modifica los permisos en Drive.
 
-## Clasificaciones, propuestas y conformidades
+## Fuentes auxiliares e históricas (no sustituyen los indicadores del informe)
 
 - **511 SDO:** `sdo_requirements`; propuestas de V06 en `sdo_compliance_proposals`, sin confundirse con estado oficial.
 - **68 solicitudes:** `proposed_requirements`; clasificación propuesta por V07 en `request_classification_proposals`.
