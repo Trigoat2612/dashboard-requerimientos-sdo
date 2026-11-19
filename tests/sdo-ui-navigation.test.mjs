@@ -27,7 +27,9 @@ test('El menú agrupa todas las secciones con desplazamiento independiente', () 
   const styles = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
   const nav = app.match(/const navGroups=\[([\s\S]+?)\];/);
   assert.ok(nav, 'Se espera agrupación del menú');
-  const tabIds = app.match(/\{id:'[^']+',label:/g).map(item => item.split("'")[1]);
+  const tabsBlock = app.match(/const tabs=\[([\s\S]+?)\];/);
+  assert.ok(tabsBlock, 'El menú de pestañas debe existir');
+  const tabIds = [...tabsBlock[1].matchAll(/\{id:'([^']+)',label:/g)].map(item => item[1]);
   const groupIds = [...nav[1].matchAll(/items:\[([^\]]+)\]/g)]
     .flatMap(match => [...match[1].matchAll(/'([^']+)'/g)].map(item => item[1]));
   assert.deepEqual([...groupIds].sort(), [...tabIds].sort(), 'Todos los ítems deben estar agrupados una sola vez');
