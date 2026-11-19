@@ -29,5 +29,7 @@ test('only secure Google links pass through',()=>{
  assert.equal(safeGoogleUrl('https://docs.google.com/document/d/abc/edit'),'https://docs.google.com/document/d/abc/edit');
  const doc=normalizeSheet(fixture())[0];const pub=toPublic({...doc,version:1,changed_at:'2026-11-19T10:00:00Z'});
  assert.equal(pub.proposal_url,doc.proposal_url);assert.equal(pub.qa_category,'pendiente');
- assert.equal(pub.technical_opinion_present,false);assert.ok(!('raw_cells' in pub));assert.ok(!('snapshot' in pub));
+ assert.equal(pub.technical_opinion_present,false);assert.ok(!('raw_cells' in pub));assert.ok(!('snapshot' in pub));assert.ok(!('correction_summary' in pub));
+ assert.equal(toPublic({...doc,technical_opinion:'PENDIENTE_CONCILIACION_DE_PAQUETE'}).technical_opinion_present,false);
+ assert.equal(toPublic({...doc,technical_opinion:'OPINION_TECNICA_PARCIAL | texto'}).technical_opinion_present,true);
 });
