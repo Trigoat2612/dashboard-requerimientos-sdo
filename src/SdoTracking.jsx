@@ -1,5 +1,6 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
 import { toSafeCsv } from './csv-utils.js';
+import { getSdoPhaseInfo } from './sdo-phases.js';
 import { RefreshCw, Download, ExternalLink, Search, Clock3, FileCheck2, FileWarning, ShieldCheck, ChevronDown, X } from 'lucide-react';
 import './sdo-tracking.css';
 const labelQa={pendiente:'QA pendiente',observado:'QA observado',conforme_delta:'QA conforme parcial / delta',conforme_integral:'QA conforme integral'};
@@ -99,15 +100,23 @@ export default function SdoTracking({token}) {
       </div>
       <div className="sdo-chartrow">
         <section className="panel sdo-panel"><h2>Avance de propuestas por fase</h2><p className="sdo-muted">Las propuestas no equivalen a subsanaciones, QA o conformidades.</p>
-          {phases.map(f=>{const set=docs.filter(d=>d.phase===f);const n=set.filter(d=>d.proposal_url).length;return <div key={f} className="sdo-phase"><span>Fase {f}</span><div className="sdo-track"><div style={{width:(100*n/Math.max(1,set.length))+'%'}}/></div><b>{n}/{set.length}</b></div>;})}
+          {phases.map(f=>{const set=docs.filter(d=>d.phase===f);const n=set.filter(d=>d.proposal_url).length;const info=getSdoPhaseInfo(f);return <div key={f} className="sdo-phase" title={info.description}><span className="sdo-phase-name"><b>Fase {f}</b><small>{info.name}</small></span><div className="sdo-track" aria-label={n+' propuestas de '+set.length+' documentos'}><div style={{width:(100*n/Math.max(1,set.length))+'%'}}/></div><b>{n}/{set.length}</b></div>;})}
         </section>
         <section className="panel sdo-panel"><h2>Evolución de modificaciones</h2><p className="sdo-muted">Historial del espejo Neon, no fecha de edición de Google Drive.</p>
           {(snapshot.changes||[]).length===0?<p>No hay historial disponible.</p>:<div className="sdo-evolution">{snapshot.changes.map((d,i)=><div key={i} className="sdo-trend" title={d.day+': '+d.changes+' versiones'}><div style={{height:(12+88*Number(d.changes)/Math.max(1,...snapshot.changes.map(x=>Number(x.changes))))+'%'}}/><span>{String(d.day).slice(5)}</span></div>)}</div>}
         </section>
       </div>
+      <section className="panel sdo-panel sdo-phase-glossary" aria-labelledby="sdo-phase-guide-title">
+        <h2 id="sdo-phase-guide-title">¿Qué significa cada fase?</h2>
+        <p className="sdo-muted">Denominaciones descriptivas basadas en los productos del catálogo de 83 documentos. No sustituyen las denominaciones contractuales ni indican conformidad.</p>
+        <div className="sdo-phase-cards">{phases.map(f=>{const info=getSdoPhaseInfo(f);const total=docs.filter(d=>d.phase===f).length;return <article key={f} className="sdo-phase-card">
+          <div className="sdo-phase-card-heading"><strong>Fase {f}</strong><span>{total} {total===1?'documento':'documentos'}</span></div>
+          <h3>{info.name}</h3><p>{info.description}</p>
+        </article>;})}</div>
+      </section>
       <section className="sdo-filters">
         <label><Search size={15}/><input aria-label="Buscar documentos" placeholder="Buscar código, documento, agente o QA" value={query} onChange={e=>setQuery(e.target.value)}/></label>
-        <select aria-label="Filtrar fase" value={phase} onChange={e=>setPhase(e.target.value)}><option>Todas</option>{phases.map(p=><option key={p} value={p}>Fase {p}</option>)}</select>
+        <select aria-label="Filtrar fase" value={phase} onChange={e=>setPhase(e.target.value)}><option>Todas</option>{phases.map(p=><option key={p} value={p}>Fase {p} · {getSdoPhaseInfo(p).name}</option>)}</select>
         <select aria-label="Filtrar agente" value={agent} onChange={e=>setAgent(e.target.value)}><option>Todos</option>{agents.map(a=><option key={a}>{a}</option>)}</select>
         <select aria-label="Filtrar QA" value={qa} onChange={e=>setQa(e.target.value)}><option>Todos</option>{qaOrder.map(k=><option key={k} value={k}>{labelQa[k]}</option>)}</select>
         <select aria-label="Filtrar propuestas" value={proposal} onChange={e=>setProposal(e.target.value)}><option>Todos</option><option>Con propuesta</option><option>Sin propuesta</option></select>
@@ -115,9 +124,9 @@ export default function SdoTracking({token}) {
       </section>
       <p className="sdo-muted">{filtered.length} de {docs.length} documentos · Datos derivados, sin modificar estados contractuales de la matriz.</p>
       <section className="table-panel"><div className="table-scroll"><table className="sdo-table"><thead><tr><th>SDO / Documento</th><th>Fase / Agente</th><th>Original</th><th>Opinión técnica</th><th>Corregido</th><th>QA</th><th>Último cambio</th><th>Detalle</th></tr></thead>
-      <tbody>{visible.map(d=><React.Fragment key={d.code}><tr><td><b>{d.code}</b><p>{d.title}</p></td><td>Fase {d.phase}<br/>{d.agent}</td><td><Link href={d.original_url||d.source_url}>{d.original_url?'Archivo citado':'Fuente / carpeta'}</Link></td><td>{d.technical_opinion_present?<Link href={d.technical_opinion_url}>Opinión técnica</Link>:<span className="sdo-muted">Sin registro</span>}</td><td><Link href={d.proposal_url}>Propuesta</Link></td><td><span className={'sdo-qa '+d.qa_category}>{labelQa[d.qa_category]}</span></td><td>{dateValue(d.changed_at)}</td><td><button className="outline-btn" onClick={()=>setSelected(selected===d.code?'':d.code)} aria-expanded={selected===d.code}>{selected===d.code?'Cerrar':'Ver ficha'} <ChevronDown size={13}/></button></td></tr>
+      <tbody>{visible.map(d=><React.Fragment key={d.code}><tr><td><b>{d.code}</b><p>{d.title}</p></td><td><b>Fase {d.phase} · {getSdoPhaseInfo(d.phase).name}</b><br/>{d.agent}</td><td><Link href={d.original_url||d.source_url}>{d.original_url?'Archivo citado':'Fuente / carpeta'}</Link></td><td>{d.technical_opinion_present?<Link href={d.technical_opinion_url}>Opinión técnica</Link>:<span className="sdo-muted">Sin registro</span>}</td><td><Link href={d.proposal_url}>Propuesta</Link></td><td><span className={'sdo-qa '+d.qa_category}>{labelQa[d.qa_category]}</span></td><td>{dateValue(d.changed_at)}</td><td><button className="outline-btn" onClick={()=>setSelected(selected===d.code?'':d.code)} aria-expanded={selected===d.code}>{selected===d.code?'Cerrar':'Ver ficha'} <ChevronDown size={13}/></button></td></tr>
       {selected===d.code&&<tr className="sdo-expanded"><td colSpan={8}>
-        <div className="sdo-detail"><div><h3>SDO {d.code} · {d.title}</h3><p><b>Estado auditoría:</b> {text(d.audit_state)} · <b>Inventario:</b> {text(d.inventory_state)}</p><p><b>Resultado de QA:</b> {text(labelQa[d.qa_category])}. Observaciones detalladas disponibles con acceso institucional.</p><p><b>Fuente:</b> <Link href={d.sheet_url}>Fila {d.source_row} de matriz maestra</Link></p><p><b>Última variación observada:</b> {dateValue(d.changed_at)} · Versión del espejo: {d.version}</p>
+        <div className="sdo-detail"><div><h3>SDO {d.code} · {d.title}</h3><p><b>Fase {d.phase}: {getSdoPhaseInfo(d.phase).name}.</b> {getSdoPhaseInfo(d.phase).description}</p><p><b>Estado auditoría:</b> {text(d.audit_state)} · <b>Inventario:</b> {text(d.inventory_state)}</p><p><b>Resultado de QA:</b> {text(labelQa[d.qa_category])}. Observaciones detalladas disponibles con acceso institucional.</p><p><b>Fuente:</b> <Link href={d.sheet_url}>Fila {d.source_row} de matriz maestra</Link></p><p><b>Última variación observada:</b> {dateValue(d.changed_at)} · Versión del espejo: {d.version}</p>
           {!token&&<p className="sdo-alert">Inicia sesión institucional para consultar el detalle de opinión, pendientes y versiones anteriores.</p>}
           {detailError&&<p className="error-banner">{detailError}</p>}
         </div>{token&&detail?.document?.code===d.code&&<div className="sdo-protected"><h3>Detalle técnico con acceso institucional</h3><p><b>Original / localizador:</b> {text(detail.document.original_reference)}</p><p><b>Problemas y opinión técnica:</b> {text(detail.document.technical_opinion)}</p><p><b>Validación adicional:</b> {text(detail.document.external_validation)}</p><p><b>Observaciones y estado QA:</b> {text(detail.document.correction_qa)}</p><p><b>Solución / documento corregido:</b> <Link href={d.proposal_url}>Abrir propuesta</Link></p><h3>Versiones y campos modificados</h3>{detail.changes.map((v,i)=><p key={i}>V{v.version} · {dateValue(v.changed_at)} · {v.changed_fields?.join(', ')||'Sin desglose'}</p>)}</div>}
