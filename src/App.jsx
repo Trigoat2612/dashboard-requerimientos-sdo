@@ -7,7 +7,7 @@ import ReportV13 from './ReportV13.jsx';
 import SdoTracking from './SdoTracking.jsx';
 import GapExplorer from './GapExplorer.jsx';
 import { toSafeCsv } from './csv-utils.js';
-import {Activity,BarChart3,BookOpen,ClipboardList,FileText,Layers,Calculator,Search,RefreshCw,ExternalLink,ChevronRight,CheckCircle2,AlertCircle,Menu,X,Save,Download,Database,Filter,ShieldCheck,Clock3,FileCheck2} from 'lucide-react';
+import {Activity,BarChart3,BookOpen,ClipboardList,FileText,Layers,Calculator,Search,RefreshCw,ExternalLink,ChevronRight,CheckCircle2,AlertCircle,Menu,X,Save,Download,Database,Filter,ShieldCheck,Clock3,FileCheck2,ChevronDown} from 'lucide-react';
 
 const tabs=[
   {id:'resumen',label:'Resumen gerencial',icon:Activity},
@@ -24,6 +24,11 @@ const tabs=[
   {id:'auditoria',label:'Auditoría documental',icon:ClipboardList},
   {id:'metodos',label:'Métodos de estimación',icon:Calculator}
 ];
+const navGroups=[
+  {id:'general',label:'Visión general',items:['resumen','criterios']},
+  {id:'analysis',label:'Análisis y estimación',items:['matriz318','incrementales','obligaciones318','brechasLaboral','exclusionesr48','metodos']},
+  {id:'documents',label:'Documentación y seguimiento',items:['seguimiento83','documentos','sdo','cobertura','auditoria']}
+];
 const states=['Cubierta','Pendiente contractual','Brecha existente','Duplicada','Genuinamente nueva','Indeterminada','Sin evaluación V07'];
 const compliance=['Por verificar','Cumple','Cumple parcialmente','No cumple','No aplica'];
 const format=n=>new Intl.NumberFormat('es-PE',{maximumFractionDigits:0}).format(Number(n)||0);
@@ -38,6 +43,7 @@ export default function App(){
   const [loading,setLoading]=useState(true),[error,setError]=useState(''),[restricted,setRestricted]=useState(false),[publicRedacted,setPublicRedacted]=useState(false);
   const [active,setActive]=useState(()=>new URLSearchParams(window.location.search).has('req')?'matriz318':'resumen'),[query,setQuery]=useState(''),[typeFilter,setTypeFilter]=useState('Todos'),[areaFilter,setAreaFilter]=useState('Todas'),[statusFilter,setStatusFilter]=useState('Todos'),[levelFilter,setLevelFilter]=useState('Todos los niveles'),[page,setPage]=useState(1);
   const [mobile,setMobile]=useState(false),[navSearch,setNavSearch]=useState(''),[selectedDetail,setSelectedDetail]=useState(null);
+  const [openNavGroups,setOpenNavGroups]=useState({general:true,analysis:false,documents:false});
   const [institutionalToken,setInstitutionalToken]=useState(null),[identity,setIdentity]=useState(null),[sessionNotice,setSessionNotice]=useState('');
   const loadEpoch=useRef(0);
   const emptyData=()=>({requests:[],sdo:[],documents:[],methods:[],evidence:[],suggestions:[],assessments:[]});
@@ -64,6 +70,7 @@ export default function App(){
   }
   useEffect(()=>{refresh(institutionalToken);},[institutionalToken]);
   useEffect(()=>{setQuery(navSearch);setTypeFilter('Todos');setAreaFilter('Todas');setStatusFilter('Todos');setLevelFilter('Todos los niveles');setPage(1);setMobile(false)},[active,navSearch]);
+  useEffect(()=>{const group=navGroups.find(g=>g.items.includes(active));if(group)setOpenNavGroups(prev=>prev[group.id]?prev:{...prev,[group.id]:true});},[active]);
   const onCredential=useCallback(async credential=>{
     const r=await fetch('/api/auth-session',{
       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential}),cache:'no-store'
@@ -166,8 +173,15 @@ export default function App(){
   return <div className="app-shell">
     <aside className={'sidebar '+(mobile?'mobile-open':'')}>
       <div className="brand"><div className="brand-icon"><Layers size={23}/></div><div><strong>EJE No Penal</strong><span>Inteligencia de requerimientos</span></div><button className="mobile-close" onClick={()=>setMobile(false)}><X size={19}/></button></div>
-      <div className="side-label">ESPACIO DE TRABAJO</div>
-      <nav>{tabs.map(t=>{const Icon=t.icon;return <button key={t.id} onClick={()=>nav(t.id)} className={'nav-button '+(active===t.id?'active':'')}><Icon size={19}/><span>{t.label}</span>{active===t.id&&<ChevronRight size={15}/>}</button>})}</nav>
+      <div className="side-label">MENÚ DE NAVEGACIÓN</div>
+      <nav className="side-nav" aria-label="Secciones del dashboard">{navGroups.map(group=><div className="side-group" key={group.id}>
+        <button type="button" className="side-group-toggle" aria-expanded={Boolean(openNavGroups[group.id])} aria-controls={'side-group-'+group.id} onClick={()=>setOpenNavGroups(prev=>({...prev,[group.id]:!prev[group.id]}))}>
+          <span>{group.label}</span><ChevronDown size={16} className={openNavGroups[group.id]?'expanded':''}/>
+        </button>
+        {openNavGroups[group.id]&&<div className="side-group-items" id={'side-group-'+group.id}>
+          {group.items.map(id=>{const t=tabs.find(item=>item.id===id);const Icon=t.icon;return <button type="button" key={t.id} onClick={()=>nav(t.id)} aria-current={active===t.id?'page':undefined} className={'nav-button '+(active===t.id?'active':'')}><Icon size={18}/><span>{t.label}</span>{active===t.id&&<ChevronRight size={15}/>}</button>})}
+        </div>}
+      </div>)}</nav>
       <div className="side-bottom"><div className="db-state"><span className={'indicator '+(error?'bad':'')}></span> Fuente de datos: Neon</div><p>Análisis preliminar y trazable. No acredita cumplimiento ni autoriza consumo de horas.</p><div className="side-version">Versión de trabajo · Noviembre 2026</div></div>
     </aside>
     {mobile&&<div className="sidebar-overlay" onClick={()=>setMobile(false)} />}
