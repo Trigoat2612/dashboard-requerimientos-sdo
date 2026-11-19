@@ -32,3 +32,25 @@
 @media(max-width:1100px){.institutional-login{max-width:255px}.institutional-user{max-width:175px}}
 @media(max-width:940px){.topbar{height:auto;min-height:70px;flex-wrap:wrap;padding:12px 20px}.topbar .refresh{margin-left:auto}.institutional-login{max-width:100%;flex:1 0 100%;justify-content:flex-start}}
 @media(max-width:630px){.institutional-login{flex-direction:column;align-items:flex-start}.institutional-user{max-width:100%}.institutional-detail{padding:16px}.institutional-detail .panel-heading{display:block}.institutional-detail .institutional-note{padding:10px}}
+
+/* Navegación lateral organizada, con desplazamiento propio en escritorio y móvil. */
+.sidebar{height:100vh;height:100dvh;min-height:0;overflow:hidden}
+.sidebar .brand,.sidebar .side-label{flex-shrink:0}
+.sidebar .brand{padding-bottom:17px}
+.sidebar .side-label{padding-bottom:8px}
+.sidebar nav.side-nav{display:block;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:0 5px 12px 0;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#7890ac #1a2c43}
+.sidebar nav.side-nav::-webkit-scrollbar{width:7px}
+.sidebar nav.side-nav::-webkit-scrollbar-track{background:#1a2c43;border-radius:8px}
+.sidebar nav.side-nav::-webkit-scrollbar-thumb{background:#7890ac;border-radius:8px}
+.side-group{border-bottom:1px solid #ffffff12;padding-bottom:4px;margin-bottom:5px}
+.side-group-toggle{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;border:0;border-radius:9px;padding:11px 12px;background:transparent;color:#d4e5f7;font-size:11px;font-weight:800;text-align:left}
+.side-group-toggle:hover,.side-group-toggle:focus-visible{background:#ffffff12;color:#fff}
+.side-group-toggle svg{transition:transform .18s;flex-shrink:0}
+.side-group-toggle svg.expanded{transform:rotate(180deg)}
+.side-group-items{display:grid;gap:3px;padding:0 0 8px 7px}
+.side-group-items .nav-button{padding:10px 9px;gap:9px;line-height:1.35;font-size:11.5px}
+.side-group-items .nav-button svg:first-child{flex-shrink:0}
+.side-group-items .nav-button span{min-width:0;overflow-wrap:anywhere}
+.sidebar .side-bottom{flex-shrink:0;margin-top:0;padding:12px 9px 4px}
+.sidebar .side-bottom p{margin:6px 0 9px}
+@media(max-width:940px){.sidebar{height:100vh;height:100dvh;overflow:hidden}}
