@@ -177,7 +177,7 @@ function Criteria({report,openDetail,onNavigate}){
    {report.categories.map(c=>{const d=definitions[c.categoria_resumen_v13]||[];const x=example(c.categoria_resumen_v13);
     return <tr key={c.categoria_resumen_v13}><td><Chip category={c.categoria_resumen_v13}>{c.categoria_visible_v13}</Chip><small>{c.solicitudes} solicitudes</small></td>
       <td className="ai-long">{d[0]}</td><td className="ai-long">{d[1]}</td>
-      <td><button className="ai-link" onClick={()=>openDetail(x.code)}>{x.code}</button><small>{clip(x.descripcion,140)}</small></td>
+      <td>{x?<><button className="ai-link" onClick={()=>openDetail(x.code)}>{x.code}</button><small>{clip(x.descripcion,140)}</small></>:<span className="muted">Sin solicitudes registradas en esta categoría (0 casos)</span>}</td>
       <td>{d[2]}</td><td>{d[3]}</td>
     </tr>})}</Table>
   </Section>
