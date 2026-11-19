@@ -8,9 +8,9 @@ export default async function handler(req,res) {
   try{
     const sql=neon(process.env.DATABASE_URL);
     const [docs,lastSync,trend]=await Promise.all([
-      sql('SELECT * FROM ejenp_requerimientos_sdo.sdo_document_catalog_83 ORDER BY source_row'),
-      sql('SELECT executed_at,success,source_count,changed_count,error_message FROM ejenp_requerimientos_sdo.sdo_document_sync_runs_83 ORDER BY id DESC LIMIT 1'),
-      sql('SELECT date_trunc(\'day\',changed_at)::date AS day,COUNT(*)::integer AS changes FROM ejenp_requerimientos_sdo.sdo_document_changes_83 GROUP BY 1 ORDER BY 1 DESC LIMIT 30')
+      sql.query('SELECT * FROM ejenp_requerimientos_sdo.sdo_document_catalog_83 ORDER BY source_row'),
+      sql.query('SELECT executed_at,success,source_count,changed_count,error_message FROM ejenp_requerimientos_sdo.sdo_document_sync_runs_83 ORDER BY id DESC LIMIT 1'),
+      sql.query('SELECT date_trunc(\'day\',changed_at)::date AS day,COUNT(*)::integer AS changes FROM ejenp_requerimientos_sdo.sdo_document_changes_83 GROUP BY 1 ORDER BY 1 DESC LIMIT 30')
     ]);
     const documents=docs.map(toPublic);
     return res.status(200).json({
