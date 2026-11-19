@@ -55,7 +55,7 @@ export default function SdoTracking({token}) {
   const opinion=docs.filter(d=>d.technical_opinion_present).length;
   const originals=docs.filter(d=>d.original_identified).length;
   const integrated=docs.filter(d=>d.integrated_in_original).length;
-  const lastSuccess=snapshot?.sync?.success?snapshot.sync.executed_at:null;
+  const lastSuccess=snapshot?.lastSuccessfulSync?.executed_at||null;
   const ageMinutes=lastSuccess?Math.floor((Date.now()-new Date(lastSuccess).getTime())/60000):null;
   function exportCsv(){
     safeCsvDownload([['ID SDO','Fase','Documento','Agente','Auditoría','Inventario','Original identificado','Opinión técnica','Propuesta URL','QA','Último cambio','Referencia Matriz'],...filtered.map(d=>[d.code,d.phase,d.title,d.agent,d.audit_state,d.inventory_state,d.original_identified?'Sí':'Sin acreditar',d.technical_opinion_present?'Sí':'No',d.proposal_url,labelQa[d.qa_category],d.changed_at,d.sheet_url])],'seguimiento_documental_sdo.csv');
