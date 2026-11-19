@@ -31,7 +31,7 @@
 - `GOOGLE_OIDC_CLIENT_ID`, `INSTITUTIONAL_ALLOWED_EMAILS`: autenticación institucional individual existente.
 - `INSTITUTIONAL_SYNC_EMAILS`: subconjunto expresamente autorizado a sincronizar.
 
-Configurar las variables directamente en el proyecto Vercel bajo la cuenta correcta. **No enviarlas por chat ni subirlas al repositorio.** El archivo `vercel.json` declara sincronización cada hora; confirmar compatibilidad de la frecuencia con el plan del equipo. La interfaz consulta el último corte cada dos minutos.
+Configurar las variables directamente en el proyecto Vercel bajo la cuenta correcta. **No enviarlas por chat ni subirlas al repositorio.** El archivo `vercel.json` declara una sincronización **diaria** compatible con Vercel Hobby (`0 11 * * *`, 11:00 UTC, aproximadamente 06:00 de Perú). En Hobby el cron puede ejecutarse dentro de la hora programada. La sincronización manual con operador autorizado permanece disponible; la interfaz consulta el último corte cada dos minutos. Para ejecutar más de una vez al día se necesita otro programador autorizado o cambiar a un plan compatible.
 
 ## Distinciones técnicas
 - **Propuesta:** existe URL válida en Y; no acredita sustitución del original.
