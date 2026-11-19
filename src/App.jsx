@@ -4,9 +4,10 @@ import InstitutionalDetailPanel from './InstitutionalDetailPanel.jsx';
 import AuditV2 from './AuditV2.jsx';
 import V09Overview from './V09Overview.jsx';
 import ReportV13 from './ReportV13.jsx';
+import SdoTracking from './SdoTracking.jsx';
 import GapExplorer from './GapExplorer.jsx';
 import { toSafeCsv } from './csv-utils.js';
-import {Activity,BarChart3,BookOpen,ClipboardList,FileText,Layers,Calculator,Search,RefreshCw,ExternalLink,ChevronRight,CheckCircle2,AlertCircle,Menu,X,Save,Download,Database,Filter,ShieldCheck,Clock3} from 'lucide-react';
+import {Activity,BarChart3,BookOpen,ClipboardList,FileText,Layers,Calculator,Search,RefreshCw,ExternalLink,ChevronRight,CheckCircle2,AlertCircle,Menu,X,Save,Download,Database,Filter,ShieldCheck,Clock3,FileCheck2} from 'lucide-react';
 
 const tabs=[
   {id:'resumen',label:'Resumen gerencial',icon:Activity},
@@ -17,6 +18,7 @@ const tabs=[
   {id:'brechasLaboral',label:'Brechas Laboral',icon:Layers},
   {id:'exclusionesr48',label:'Exclusiones y reformulación',icon:Filter},
   {id:'documentos',label:'Documentación y evidencias',icon:FileText},
+  {id:'seguimiento83',label:'Seguimiento documental SDO',icon:FileCheck2},
   {id:'sdo',label:'Requisitos SDO',icon:BookOpen},
   {id:'cobertura',label:'Contraste documental SDO',icon:ShieldCheck},
   {id:'auditoria',label:'Auditoría documental',icon:ClipboardList},
@@ -177,10 +179,11 @@ export default function App(){
       {data.generatedAt&&<div className="mini">Última consulta de registros: {new Date(data.generatedAt).toLocaleString('es-PE')}</div>}
       {assessmentFetch.loading&&['cobertura','auditoria'].includes(active)&&<div className="insight" role="status"><FileText size={18}/><div><b>Cargando trazabilidad documental</b><p>{assessmentFetch.loaded} de {assessmentFetch.total||'…'} evaluaciones recuperadas en lotes autorizados.</p></div></div>}
       {publicRedacted&&active!=='resumen'&&<div className="insight"><ShieldCheck size={18}/><div><b>Consulta disponible · datos protegidos</b><p>El inventario y los análisis documentales, con sus títulos y enlaces, pueden consultarse íntegramente. Los fundamentos independientes V06/V07 se distinguen de las conformidades oficiales.</p></div></div>}
-      <header className="page-header"><div><span className="eyebrow">CONTROL Y TRAZABILIDAD</span><h1>{tabs.find(t=>t.id===active)?.label}</h1><p>{active==='v2'?'Avance independiente de la auditoría documental, el cumplimiento SDO, las brechas, las solicitudes y la bolsa de horas.':active==='resumen'?'Resultados consolidados de 318 solicitudes, 122 funcionalidades incrementales propuestas y estimación WBS/PERT para evaluación del usuario final.':active==='historico'?'Vista histórica sin estimaciones sustentadas ni detalles restringidos.':active==='sdo'?'Requisitos SDO codificados y dictámenes propuestos V06; el texto contractual público se conserva; fundamentos V06 detallados requieren autorización.':active==='nuevos'?'Solicitudes clasificadas por V07. El texto original ya público se conserva; condiciones contractuales V07 detalladas requieren autorización.':active==='documentos'?'Inventario documental íntegro: títulos, enlaces y análisis disponibles sin filtros por nombre del archivo.':active==='cobertura'?'Evaluaciones por documento y criterio SDO, diferenciando evidencia de conformidad.':active==='auditoria'?'Auditoría de inventario: vínculo documental no equivale a cumplimiento.':'Contraste de métodos para dimensionar la bolsa de horas y sus riesgos.'}</p></div><span className="live"><span className="green-dot"/> {loading?'Cargando':restricted?'Sin conexión de detalle':publicRedacted?'Datos anonimizados de Neon':publicLegacy?'Consulta pública documental':'Consulta institucional autorizada'}</span></header>
+      <header className="page-header"><div><span className="eyebrow">CONTROL Y TRAZABILIDAD</span><h1>{tabs.find(t=>t.id===active)?.label}</h1><p>{active==='v2'?'Avance independiente de la auditoría documental, el cumplimiento SDO, las brechas, las solicitudes y la bolsa de horas.':active==='resumen'?'Resultados consolidados de 318 solicitudes, 122 funcionalidades incrementales propuestas y estimación WBS/PERT para evaluación del usuario final.':active==='historico'?'Vista histórica sin estimaciones sustentadas ni detalles restringidos.':active==='sdo'?'Requisitos SDO codificados y dictámenes propuestos V06; el texto contractual público se conserva; fundamentos V06 detallados requieren autorización.':active==='nuevos'?'Solicitudes clasificadas por V07. El texto original ya público se conserva; condiciones contractuales V07 detalladas requieren autorización.':active==='seguimiento83'?'Seguimiento dinámico de los 83 productos SDO; propuestas, QA y aprobación son estados distintos.':active==='documentos'?'Inventario documental íntegro: títulos, enlaces y análisis disponibles sin filtros por nombre del archivo.':active==='cobertura'?'Evaluaciones por documento y criterio SDO, diferenciando evidencia de conformidad.':active==='auditoria'?'Auditoría de inventario: vínculo documental no equivale a cumplimiento.':'Contraste de métodos para dimensionar la bolsa de horas y sus riesgos.'}</p></div><span className="live"><span className="green-dot"/> {loading?'Cargando':restricted?'Sin conexión de detalle':publicRedacted?'Datos anonimizados de Neon':publicLegacy?'Consulta pública documental':'Consulta institucional autorizada'}</span></header>
       {['resumen','matriz318','incrementales','criterios','obligaciones318','brechasLaboral','exclusionesr48'].includes(active)&&<ReportV13 view={active} onNavigate={nav}/>}
        {active==='historicoV09'&&<V09Overview onNavigate={nav}/>}
       {active==='v2'&&<AuditV2/>}
+      {active==='seguimiento83'&&<SdoTracking token={institutionalToken}/>}
       {active==='brechas'&&<GapExplorer onOpenSdo={code=>nav('sdo',code,{kind:'sdo',id:code})} onOpenRequest={code=>nav('nuevos',code,{kind:'request',id:code})}/>}
       {restricted&&['sdo','nuevos','documentos','cobertura','auditoria','metodos','historico'].includes(active)&&<div className="insight"><ShieldCheck size={20}/><div><b>Consulta temporalmente no disponible</b><p>El servicio no entregó metadatos consultables. Los indicadores agregados siguen disponibles en el resumen ejecutivo. Reintenta la conexión; nunca se publicarán datos restringidos sin autorización.</p></div></div>}
       {!restricted&&active==='historico'&&<><section className="stat-grid">
