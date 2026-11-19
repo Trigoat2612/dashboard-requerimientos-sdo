@@ -22,6 +22,7 @@ test('QA delta is not full compliance and observations take precedence',()=>{
  assert.equal(qaCategory('QA A11 DELTA CONFORME LIMITADO 3/3'),'conforme_delta');
  assert.equal(qaCategory('QA INTEGRAL CONFORME'),'conforme_integral');
  assert.equal(qaCategory('PROPUESTA_EDITABLE_PARCIAL | QA PENDIENTE'),'pendiente');
+ assert.equal(qaCategory('dos observaciones QA delta v0.2 subsanadas | QA DELTA A11 V0.3 PENDIENTE'),'pendiente');
 });
 test('only secure Google links pass through',()=>{
  assert.equal(safeGoogleUrl('javascript:alert(1)'),'');
