@@ -6,3 +6,22 @@
 .sdo-filters{display:flex;gap:9px;flex-wrap:wrap}.sdo-filters label{display:flex;align-items:center;gap:7px;background:#fff;border:1px solid #dfe6ef;border-radius:8px;padding:0 10px;flex:1;min-width:200px}.sdo-filters input{width:100%;min-width:0;border:0;outline:0;padding:11px 0;font-size:11px}.sdo-filters select{border:1px solid #dfe6ef;border-radius:8px;background:white;padding:10px;font-size:11px;color:#536d8d;max-width:180px}
 .sdo-table{min-width:1120px}.sdo-table td p{margin:5px 0;font-size:11px}.sdo-link{font-size:11px;color:#1689aa;font-weight:800;display:inline-flex;align-items:center;gap:3px;overflow-wrap:anywhere}.sdo-link:hover{text-decoration:underline}.sdo-qa{display:inline-block;padding:6px 8px;border-radius:7px;font-size:10px;font-weight:800;white-space:normal}.sdo-qa.pendiente{background:#f0f3f7;color:#61788d}.sdo-qa.observado{background:#ffeded;color:#ae4d52}.sdo-qa.conforme_delta{background:#fff4df;color:#946416}.sdo-qa.conforme_integral{background:#e2f8ed;color:#238258}.sdo-expanded{background:#f8fbfd}.sdo-expanded:hover{background:#f8fbfd}.sdo-detail{padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:22px;overflow-wrap:anywhere}.sdo-detail h3{color:#224d6e;font-size:13px}.sdo-detail p{font-size:11px;line-height:1.7}.sdo-protected{background:white;padding:16px;border-radius:12px}.sdo-pager{display:flex;justify-content:space-between;align-items:center;color:#8396aa;font-size:12px}.sdo-pager>div{display:flex;gap:7px}
 @media(max-width:1380px){.sdo-kpi{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:850px){.sdo-kpi{grid-template-columns:repeat(2,minmax(0,1fr))}.sdo-chartrow,.sdo-detail{grid-template-columns:1fr}}@media(max-width:450px){.sdo-kpi{grid-template-columns:1fr}}
+
+/* Identificación legible de las siete fases, extraída de los productos Catalogo_83. */
+.sdo-phase{grid-template-columns:minmax(168px,1.35fr) minmax(65px,1fr) 42px;gap:9px}
+.sdo-phase > b{text-align:right}
+.sdo-phase-name{display:flex;flex-direction:column;gap:3px;min-width:0}
+.sdo-phase-name b{font-size:11px;color:#345573;text-align:left}
+.sdo-phase-name small{font-size:10px;line-height:1.45;color:#657e96;overflow-wrap:anywhere}
+.sdo-phase-glossary{margin:0}
+.sdo-phase-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin-top:15px}
+.sdo-phase-card{border:1px solid #e1eaf2;background:#f8fbfe;border-radius:11px;padding:14px 15px}
+.sdo-phase-card-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:10px;color:#567a9a}
+.sdo-phase-card-heading strong{color:#167f9c}
+.sdo-phase-card-heading span{white-space:nowrap}
+.sdo-phase-card h3{color:#284969;font-size:13px;margin:7px 0 5px}
+.sdo-phase-card p{color:#6c8299;font-size:11px;line-height:1.65;margin:0}
+.sdo-filters select[aria-label="Filtrar fase"]{max-width:290px}
+@media(max-width:1180px){.sdo-phase-cards{grid-template-columns:1fr}}
+@media(max-width:850px){.sdo-phase-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:580px){.sdo-phase-cards{grid-template-columns:1fr}.sdo-phase{grid-template-columns:minmax(140px,1.4fr) minmax(60px,1fr) 38px}.sdo-filters select[aria-label="Filtrar fase"]{max-width:100%;width:100%}}
