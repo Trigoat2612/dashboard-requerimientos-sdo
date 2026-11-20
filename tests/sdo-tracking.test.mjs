@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSheet,qaCategory,toPublic,safeGoogleUrl,EXPECTED_HEADERS } from '../lib/sdo-document-model.js';
+import { normalizeSheet,qaCategory,toPublic,safeGoogleUrl,EXPECTED_HEADERS,isValidSdoCode } from '../lib/sdo-document-model.js';
 function fixture(){
  const header=Array(26).fill('');for(const [idx,name] of Object.entries(EXPECTED_HEADERS))header[Number(idx)]=name;
  return [header,...Array.from({length:83},(_,i)=>{const x=Array(26).fill('');x[0]=(Math.floor(i/15)+1)+'.'+(i%15+1);x[1]=''+(Math.floor(i/15)+1);x[2]='Documento '+i;x[4]='A03';x[24]=i<35?'https://docs.google.com/document/d/a'+i+'/edit':'';return x;})];
@@ -35,4 +35,20 @@ test('only secure Google links pass through',()=>{
  assert.equal(toPublic({...doc,original_reference:'PDF 1ZSEY1E_IDh9S_c5oc1ziJBh-1WlJxYV0'}).original_url,'https://drive.google.com/file/d/1ZSEY1E_IDh9S_c5oc1ziJBh-1WlJxYV0/view');assert.ok(!('raw_cells' in pub));assert.ok(!('snapshot' in pub));assert.ok(!('correction_summary' in pub));
  assert.equal(toPublic({...doc,technical_opinion:'PENDIENTE_CONCILIACION_DE_PAQUETE'}).technical_opinion_present,false);
  assert.equal(toPublic({...doc,technical_opinion:'OPINION_TECNICA_PARCIAL | texto'}).technical_opinion_present,true);
+});
+
+test('SDO letter-suffix codes synchronize and open safely',()=>{
+  const rows=fixture();
+  rows[5][0]='2.1.a';
+  rows[6][0]='2.1.j';
+  const normalized=normalizeSheet(rows);
+  assert.equal(normalized.length,83);
+  assert.ok(normalized.some(x=>x.code==='2.1.a'));
+  assert.ok(normalized.some(x=>x.code==='2.1.j'));
+  assert.equal(isValidSdoCode('2.1.a'),true);
+  assert.equal(isValidSdoCode('2.1.j'),true);
+  assert.equal(isValidSdoCode('4.2.10'),true);
+  for(const wrong of ['2..1','2.1.', '2.1.abc/1','2.1.j;DROP TABLE','2.1-j']) {
+    assert.equal(isValidSdoCode(wrong),false,wrong);
+  }
 });
