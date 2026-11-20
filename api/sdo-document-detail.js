@@ -1,12 +1,13 @@
 import { neon } from '@neondatabase/serverless';
 import { verifyInstitutionalToken,extractBearer,authErrorResponse,protectedHeaders } from '../lib/institutional-auth.js';
+import { isValidSdoCode } from '../lib/sdo-document-model.js';
 export default async function handler(req,res) {
   protectedHeaders(res);
   if(req.method!=='GET')return res.status(405).json({error:'Método no permitido'});
   try{
     const identity=await verifyInstitutionalToken(extractBearer(req));
     const code=String(req.query?.code||'').trim();
-    if(!/^\d+(?:\.\d+)*$/.test(code))return res.status(400).json({error:'Código inválido'});
+    if(!isValidSdoCode(code))return res.status(400).json({error:'Código inválido'});
     const sql=neon(process.env.DATABASE_URL);
     const [rows,changes]=await Promise.all([
       sql.query('SELECT code,source_row,phase,title,agent,source_note,original_reference,technical_opinion,external_validation,proposal_url,correction_qa,version,changed_at,snapshot FROM ejenp_requerimientos_sdo.sdo_document_catalog_83 WHERE code=$1',[code]),
