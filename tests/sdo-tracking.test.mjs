@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSheet,qaCategory,toPublic,safeGoogleUrl,EXPECTED_HEADERS,isValidSdoCode } from '../lib/sdo-document-model.js';
+import { normalizeSheet,qaCategory,toPublic,qaEditorialSnapshot,safeGoogleUrl,EXPECTED_HEADERS,isValidSdoCode } from '../lib/sdo-document-model.js';
 function fixture(){
  const header=Array(26).fill('');for(const [idx,name] of Object.entries(EXPECTED_HEADERS))header[Number(idx)]=name;
  return [header,...Array.from({length:83},(_,i)=>{const x=Array(26).fill('');x[0]=(Math.floor(i/15)+1)+'.'+(i%15+1);x[1]=''+(Math.floor(i/15)+1);x[2]='Documento '+i;x[4]='A03';x[24]=i<35?'https://docs.google.com/document/d/a'+i+'/edit':'';return x;})];
@@ -51,4 +51,19 @@ test('SDO letter-suffix codes synchronize and open safely',()=>{
   for(const wrong of ['2..1','2.1.', '2.1.abc/1','2.1.j;DROP TABLE','2.1-j']) {
     assert.equal(isValidSdoCode(wrong),false,wrong);
   }
+});
+
+
+test('QA editorial del corte 22/11 se reporta sin inventar conformidad integral',()=>{
+ const tagged='PROPUESTA_TECNICA_RECONSTRUIDA_EDITABLE_v0.1 | QA_TEXTO_INDEPENDIENTE_PENDIENTE | QA_EDITORIAL_83_22NOV_REVISADO_CON_OBSERVACIONES | DETALLE https://docs.google.com/spreadsheets/d/1VG0Hawz_HZKPBdDAwPuznagJ47MTaFJwJjNTqOAFRww/edit#gid=2261122';
+ assert.deepEqual(qaEditorialSnapshot(tagged),{reviewed:true,conditioned:true,reconstructed:true});
+ assert.equal(qaCategory(tagged),'pendiente');
+ const row=normalizeSheet(fixture())[0];
+ const result=toPublic({...row,correction_qa:tagged,version:2,changed_at:'2026-11-22T19:00:00Z'});
+ assert.equal(result.qa_editorial_reviewed,true);
+ assert.equal(result.qa_editorial_conditioned,true);
+ assert.equal(result.qa_technical_reconstruction,true);
+ assert.notEqual(result.qa_category,'conforme_integral');
+ assert.equal(qaEditorialSnapshot('QA DELTA CONFORME').reviewed,false);
+ assert.equal(qaEditorialSnapshot('QA DELTA CONFORME').reconstructed,false);
 });
