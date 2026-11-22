@@ -36,3 +36,19 @@ test('El menú agrupa todas las secciones con desplazamiento independiente', () 
   assert.match(styles, /\.sidebar nav\.side-nav\{[^}]*overflow-y:auto/);
   assert.match(app, /aria-expanded=\{Boolean\(openNavGroups\[group\.id\]\)\}/);
 });
+
+
+test('El seguimiento SDO presenta el corte QA 83 con filtros y sin afirmar QA integral',()=>{
+ const ui=readFileSync(new URL('../src/SdoTracking.jsx',import.meta.url),'utf8');
+ const model=readFileSync(new URL('../lib/sdo-document-model.js',import.meta.url),'utf8');
+ assert.match(ui,/Resultados de QA documental/);
+ assert.match(ui,/qa_editorial_reviewed/);
+ assert.match(ui,/qa_technical_reconstruction/);
+ assert.match(ui,/Filtrar QA editorial/);
+ assert.match(ui,/QA integral acreditado/);
+ assert.match(ui,/QA_REPORT_URL/);
+ assert.match(ui,/QA_DETAIL_URL/);
+ assert.match(model,/qaEditorialSnapshot/);
+ assert.match(model,/qa_editorial_conditioned/);
+ assert.doesNotMatch(ui,/QA integral acreditado: 83/);
+});
