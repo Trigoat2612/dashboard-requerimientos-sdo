@@ -5,6 +5,8 @@ import { RefreshCw, Download, ExternalLink, Search, Clock3, FileCheck2, FileWarn
 import './sdo-tracking.css';
 const labelQa={pendiente:'QA pendiente',observado:'QA observado',conforme_delta:'QA conforme parcial / delta',conforme_integral:'QA conforme integral'};
 const qaOrder=['pendiente','observado','conforme_delta','conforme_integral'];
+const QA_REPORT_URL='https://docs.google.com/document/d/1ntjx0chN0zb-hiL3XjrDfxDPIDX5eDgXTje2spTGbWU/edit';
+const QA_DETAIL_URL='https://docs.google.com/spreadsheets/d/1VG0Hawz_HZKPBdDAwPuznagJ47MTaFJwJjNTqOAFRww/edit#gid=2261122';
 const dateValue=value=>value?new Date(value).toLocaleString('es-PE',{dateStyle:'short',timeStyle:'short'}):'No disponible';
 const text=(v,def='No informado')=>String(v||'').trim()||def;
 function Link({href,children}) {return href?<a className="sdo-link" href={href} target="_blank" rel="noopener noreferrer">{children} <ExternalLink size={13}/></a>:<span className="sdo-muted">Sin enlace</span>;}
@@ -16,7 +18,7 @@ function safeCsvDownload(rows,name) {
 }
 export default function SdoTracking({token}) {
   const [snapshot,setSnapshot]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
-  const [query,setQuery]=useState(''),[phase,setPhase]=useState('Todas'),[agent,setAgent]=useState('Todos'),[qa,setQa]=useState('Todos'),[proposal,setProposal]=useState('Todos');
+  const [query,setQuery]=useState(''),[phase,setPhase]=useState('Todas'),[agent,setAgent]=useState('Todos'),[qa,setQa]=useState('Todos'),[proposal,setProposal]=useState('Todos'),[editorial,setEditorial]=useState('Todos');
   const [order,setOrder]=useState('source'),[page,setPage]=useState(1),[selected,setSelected]=useState(''),[detail,setDetail]=useState(null),[detailError,setDetailError]=useState(''),[syncing,setSyncing]=useState(false),[syncMessage,setSyncMessage]=useState('');
   const load=useCallback(async()=>{
     try{
@@ -37,7 +39,7 @@ export default function SdoTracking({token}) {
       .then(setDetail).catch(e=>{if(!controller.signal.aborted)setDetailError(e.message);});
     return()=>controller.abort();
   },[selected,token]);
-  useEffect(()=>setPage(1),[query,phase,agent,qa,proposal,order]);
+  useEffect(()=>setPage(1),[query,phase,agent,qa,proposal,editorial,order]);
   const docs=snapshot?.documents||[];
   const phases=useMemo(()=>[...new Set(docs.map(d=>d.phase))].sort((a,b)=>Number(a)-Number(b)),[docs]);
   const agents=useMemo(()=>[...new Set(docs.map(d=>d.agent))].sort(),[docs]);
@@ -46,9 +48,10 @@ export default function SdoTracking({token}) {
     return docs.filter(d=>{
       const match=!q||[d.code,d.title,d.agent,d.audit_state].some(v=>String(v||'').toLocaleLowerCase('es').includes(q));
       return match&&(phase==='Todas'||d.phase===phase)&&(agent==='Todos'||d.agent===agent)&&(qa==='Todos'||d.qa_category===qa)
-        &&(proposal==='Todos'||(proposal==='Con propuesta')===Boolean(d.proposal_url));
+        &&(proposal==='Todos'||(proposal==='Con propuesta')===Boolean(d.proposal_url))
+        &&(editorial==='Todos'||(editorial==='Revisados'&&d.qa_editorial_reviewed)||(editorial==='Reconstruidos'&&d.qa_technical_reconstruction)||(editorial==='Sin revisión'&&!d.qa_editorial_reviewed));
     }).sort((a,b)=>order==='name'?a.title.localeCompare(b.title,'es'):order==='updated'?new Date(b.changed_at)-new Date(a.changed_at):order==='phase'?Number(a.phase)-Number(b.phase)||a.source_row-b.source_row:a.source_row-b.source_row);
-  },[docs,query,phase,agent,qa,proposal,order]);
+  },[docs,query,phase,agent,qa,proposal,editorial,order]);
   const pageSize=15,numberOfPages=Math.max(1,Math.ceil(filtered.length/pageSize));
   const visible=filtered.slice((Math.min(page,numberOfPages)-1)*pageSize,Math.min(page,numberOfPages)*pageSize);
   const proposed=docs.filter(d=>d.proposal_url).length;
@@ -56,10 +59,13 @@ export default function SdoTracking({token}) {
   const opinion=docs.filter(d=>d.technical_opinion_present).length;
   const originals=docs.filter(d=>d.original_identified).length;
   const integrated=docs.filter(d=>d.integrated_in_original).length;
+  const editorialReviewed=docs.filter(d=>d.qa_editorial_reviewed).length;
+  const editorialConditioned=docs.filter(d=>d.qa_editorial_conditioned).length;
+  const reconstructions=docs.filter(d=>d.qa_technical_reconstruction).length;
   const lastSuccess=snapshot?.lastSuccessfulSync?.executed_at||null;
   const ageMinutes=lastSuccess?Math.floor((Date.now()-new Date(lastSuccess).getTime())/60000):null;
   function exportCsv(){
-    safeCsvDownload([['ID SDO','Fase','Documento','Agente','Auditoría','Inventario','Original identificado','Opinión técnica','Propuesta URL','QA','Último cambio','Referencia Matriz'],...filtered.map(d=>[d.code,d.phase,d.title,d.agent,d.audit_state,d.inventory_state,d.original_identified?'Sí':'Sin acreditar',d.technical_opinion_present?'Sí':'No',d.proposal_url,labelQa[d.qa_category],d.changed_at,d.sheet_url])],'seguimiento_documental_sdo.csv');
+    safeCsvDownload([['ID SDO','Fase','Documento','Agente','Auditoría','Inventario','Original identificado','Opinión técnica','Propuesta URL','QA técnico','QA editorial corte 22/11','Reconstrucción sin original','Último cambio','Referencia Matriz'],...filtered.map(d=>[d.code,d.phase,d.title,d.agent,d.audit_state,d.inventory_state,d.original_identified?'Sí':'Sin acreditar',d.technical_opinion_present?'Sí':'No',d.proposal_url,labelQa[d.qa_category],d.qa_editorial_reviewed?'Revisado condicionado':'No revisado',d.qa_technical_reconstruction?'Sí':'No',d.changed_at,d.sheet_url])],'seguimiento_documental_sdo.csv');
   }
   async function manualSync(){
     if(!token)return;
@@ -90,6 +96,9 @@ export default function SdoTracking({token}) {
         <Stat name="Documentos SDO" value={docs.length} subtitle="Universo documental, no requisitos"/>
         <Stat name="Originales identificados" value={originals} subtitle="ID o enlace citado, requiere contraste"/>
         <Stat name="Opinión técnica" value={opinion} subtitle="Registro de opinión, no aprobación"/>
+        <Stat name="Revisión editorial 22/11" value={editorialReviewed} subtitle="Documentos inspeccionados de 83"/>
+        <Stat name="Editorial condicionado" value={editorialConditioned} subtitle="Reservas y observaciones, no incumplimientos"/>
+        <Stat name="Reconstrucciones" value={reconstructions} subtitle="Propuestas sin original individual"/>
         <Stat name="Con propuesta" value={proposed} subtitle="URL de versión corregida"/>
         <Stat name="Sin propuesta" value={docs.length-proposed} subtitle="Pendiente de documento corregido"/>
         <Stat name="QA pendiente" value={qaCounts.pendiente} subtitle="Incluye documentos sin propuesta"/>
@@ -98,6 +107,12 @@ export default function SdoTracking({token}) {
         <Stat name="QA conforme integral" value={qaCounts.conforme_integral} subtitle="Solo si se declara explícitamente"/>
         <Stat name="Integrados en originales" value={integrated} subtitle="Solo integración explícitamente acreditada"/>
       </div>
+      <section className="panel sdo-qa-cut" aria-label="Resultados de QA documental 22 de noviembre">
+        <div className="sdo-qa-cut-header"><div><h2>Resultados de QA documental · 22/11/2026</h2><p className="sdo-muted">Inspección textual y estructural: {editorialReviewed} de {docs.length} documentos. Los {editorialConditioned} dictámenes condicionados no equivalen a defectos graves ni a QA integral conforme.</p></div><span className="sdo-qa observado">QA integral acreditado: {qaCounts.conforme_integral}</span></div>
+        <div className="sdo-qa-cut-grid"><span><b>{editorialReviewed}/{docs.length}</b> revisados editorialmente</span><span><b>{editorialConditioned}</b> con reservas de revisión</span><span><b>{reconstructions}</b> reconstrucciones técnicas</span><span><b>{qaCounts.conforme_integral}</b> QA integral conforme</span></div>
+        <p className="sdo-muted">Fuentes: Catalogo_83 y su espejo Neon. Una propuesta redactada o revisada no acredita cotejo íntegro con el original, implementación ni aceptación institucional. Los resultados de QA no deben confundirse con las pruebas del sistema.</p>
+        {token&&<div className="sdo-qa-cut-links"><Link href={QA_REPORT_URL}>Informe de QA de 83 documentos</Link><Link href={QA_DETAIL_URL}>Matriz de observaciones y correcciones</Link></div>}
+      </section>
       <div className="sdo-chartrow">
         <section className="panel sdo-panel"><h2>Avance de propuestas por fase</h2><p className="sdo-muted">Las propuestas no equivalen a subsanaciones, QA o conformidades.</p>
           {phases.map(f=>{const set=docs.filter(d=>d.phase===f);const n=set.filter(d=>d.proposal_url).length;const info=getSdoPhaseInfo(f);return <div key={f} className="sdo-phase" title={info.description}><span className="sdo-phase-name"><b>Fase {f}</b><small>{info.name}</small></span><div className="sdo-track" aria-label={n+' propuestas de '+set.length+' documentos'}><div style={{width:(100*n/Math.max(1,set.length))+'%'}}/></div><b>{n}/{set.length}</b></div>;})}
@@ -120,13 +135,14 @@ export default function SdoTracking({token}) {
         <select aria-label="Filtrar agente" value={agent} onChange={e=>setAgent(e.target.value)}><option>Todos</option>{agents.map(a=><option key={a}>{a}</option>)}</select>
         <select aria-label="Filtrar QA" value={qa} onChange={e=>setQa(e.target.value)}><option>Todos</option>{qaOrder.map(k=><option key={k} value={k}>{labelQa[k]}</option>)}</select>
         <select aria-label="Filtrar propuestas" value={proposal} onChange={e=>setProposal(e.target.value)}><option>Todos</option><option>Con propuesta</option><option>Sin propuesta</option></select>
+        <select aria-label="Filtrar QA editorial" value={editorial} onChange={e=>setEditorial(e.target.value)}><option>Todos</option><option>Revisados</option><option>Reconstruidos</option><option>Sin revisión</option></select>
         <select aria-label="Ordenar" value={order} onChange={e=>setOrder(e.target.value)}><option value="source">Orden matriz</option><option value="name">Nombre A-Z</option><option value="phase">Fase</option><option value="updated">Cambio reciente</option></select>
       </section>
       <p className="sdo-muted">{filtered.length} de {docs.length} documentos · Datos derivados, sin modificar estados contractuales de la matriz.</p>
-      <section className="table-panel"><div className="table-scroll"><table className="sdo-table"><thead><tr><th>SDO / Documento</th><th>Fase / Agente</th><th>Original</th><th>Opinión técnica</th><th>Corregido</th><th>QA</th><th>Último cambio</th><th>Detalle</th></tr></thead>
-      <tbody>{visible.map(d=><React.Fragment key={d.code}><tr><td><b>{d.code}</b><p>{d.title}</p></td><td><b>Fase {d.phase} · {getSdoPhaseInfo(d.phase).name}</b><br/>{d.agent}</td><td><Link href={d.original_url||d.source_url}>{d.original_url?'Archivo citado':'Fuente / carpeta'}</Link></td><td>{d.technical_opinion_present?<Link href={d.technical_opinion_url}>Opinión técnica</Link>:<span className="sdo-muted">Sin registro</span>}</td><td><Link href={d.proposal_url}>Propuesta</Link></td><td><span className={'sdo-qa '+d.qa_category}>{labelQa[d.qa_category]}</span></td><td>{dateValue(d.changed_at)}</td><td><button className="outline-btn" onClick={()=>setSelected(selected===d.code?'':d.code)} aria-expanded={selected===d.code}>{selected===d.code?'Cerrar':'Ver ficha'} <ChevronDown size={13}/></button></td></tr>
-      {selected===d.code&&<tr className="sdo-expanded"><td colSpan={8}>
-        <div className="sdo-detail"><div><h3>SDO {d.code} · {d.title}</h3><p><b>Fase {d.phase}: {getSdoPhaseInfo(d.phase).name}.</b> {getSdoPhaseInfo(d.phase).description}</p><p><b>Estado auditoría:</b> {text(d.audit_state)} · <b>Inventario:</b> {text(d.inventory_state)}</p><p><b>Resultado de QA:</b> {text(labelQa[d.qa_category])}. Observaciones detalladas disponibles con acceso institucional.</p><p><b>Fuente:</b> <Link href={d.sheet_url}>Fila {d.source_row} de matriz maestra</Link></p><p><b>Última variación observada:</b> {dateValue(d.changed_at)} · Versión del espejo: {d.version}</p>
+      <section className="table-panel"><div className="table-scroll"><table className="sdo-table"><thead><tr><th>SDO / Documento</th><th>Fase / Agente</th><th>Original</th><th>Opinión técnica</th><th>Corregido</th><th>QA editorial</th><th>QA técnico</th><th>Último cambio</th><th>Detalle</th></tr></thead>
+      <tbody>{visible.map(d=><React.Fragment key={d.code}><tr><td><b>{d.code}</b><p>{d.title}</p></td><td><b>Fase {d.phase} · {getSdoPhaseInfo(d.phase).name}</b><br/>{d.agent}</td><td><Link href={d.original_url||d.source_url}>{d.original_url?'Archivo citado':'Fuente / carpeta'}</Link></td><td>{d.technical_opinion_present?<Link href={d.technical_opinion_url}>Opinión técnica</Link>:<span className="sdo-muted">Sin registro</span>}</td><td><Link href={d.proposal_url}>Propuesta</Link>{d.qa_technical_reconstruction&&<div className="sdo-reconstructed">Reconstrucción técnica</div>}</td><td><span className={'sdo-qa '+(d.qa_editorial_reviewed?'condicionado':'pendiente')}>{d.qa_editorial_reviewed?'Revisado · condicionado':'Sin corte editorial'}</span></td><td><span className={'sdo-qa '+d.qa_category}>{labelQa[d.qa_category]}</span></td><td>{dateValue(d.changed_at)}</td><td><button className="outline-btn" onClick={()=>setSelected(selected===d.code?'':d.code)} aria-expanded={selected===d.code}>{selected===d.code?'Cerrar':'Ver ficha'} <ChevronDown size={13}/></button></td></tr>
+      {selected===d.code&&<tr className="sdo-expanded"><td colSpan={9}>
+        <div className="sdo-detail"><div><h3>SDO {d.code} · {d.title}</h3><p><b>Fase {d.phase}: {getSdoPhaseInfo(d.phase).name}.</b> {getSdoPhaseInfo(d.phase).description}</p><p><b>Estado auditoría:</b> {text(d.audit_state)} · <b>Inventario:</b> {text(d.inventory_state)}</p><p><b>QA técnico:</b> {text(labelQa[d.qa_category])}. <b>QA editorial 22/11:</b> {d.qa_editorial_reviewed?'Revisión realizada con reservas':'Sin registro en el corte'}. {d.qa_technical_reconstruction?'Documento reconstruido sin original autónomo.':''} Observaciones detalladas disponibles con acceso institucional.</p><p><b>Fuente:</b> <Link href={d.sheet_url}>Fila {d.source_row} de matriz maestra</Link></p><p><b>Última variación observada:</b> {dateValue(d.changed_at)} · Versión del espejo: {d.version}</p>
           {!token&&<p className="sdo-alert">Inicia sesión institucional para consultar el detalle de opinión, pendientes y versiones anteriores.</p>}
           {detailError&&<p className="error-banner">{detailError}</p>}
         </div>{token&&detail?.document?.code===d.code&&<div className="sdo-protected"><h3>Detalle técnico con acceso institucional</h3><p><b>Original / localizador:</b> {text(detail.document.original_reference)}</p><p><b>Problemas y opinión técnica:</b> {text(detail.document.technical_opinion)}</p><p><b>Validación adicional:</b> {text(detail.document.external_validation)}</p><p><b>Observaciones y estado QA:</b> {text(detail.document.correction_qa)}</p><p><b>Solución / documento corregido:</b> <Link href={d.proposal_url}>Abrir propuesta</Link></p><h3>Versiones y campos modificados</h3>{detail.changes.map((v,i)=><p key={i}>V{v.version} · {dateValue(v.changed_at)} · {v.changed_fields?.join(', ')||'Sin desglose'}</p>)}</div>}
